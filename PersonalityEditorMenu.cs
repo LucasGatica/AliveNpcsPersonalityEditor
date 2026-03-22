@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.GameData.Characters;
 using StardewValley.Menus;
 
 namespace AliveNpcsPersonalityEditor;
@@ -14,14 +15,32 @@ public class PersonalityEditorMenu : IClickableMenu
     private readonly IMonitor _monitor;
     private readonly ITranslationHelper _i18n;
     private readonly Dictionary<string, string> _defaults = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Texture2D?> _portraits = new(StringComparer.OrdinalIgnoreCase);
 
-    // ── Categories ──
-    private static readonly (string Key, string[] Npcs)[] Categories =
+    // ── Categories (built dynamically from API) ──
+    private readonly (string Key, string[] Npcs)[] _categories;
+
+    private static readonly HashSet<string> KnownBachelors = new(StringComparer.OrdinalIgnoreCase)
+        { "Alex", "Elliott", "Harvey", "Sam", "Sebastian", "Shane" };
+    private static readonly HashSet<string> KnownBachelorettes = new(StringComparer.OrdinalIgnoreCase)
+        { "Abigail", "Emily", "Haley", "Leah", "Maru", "Penny" };
+    private static readonly HashSet<string> KnownSpecial = new(StringComparer.OrdinalIgnoreCase)
+        { "Dwarf", "Krobus", "Sandy", "Wizard", "Leo" };
+
+    private static readonly Dictionary<string, string> SveFallbackPersonalities = new(StringComparer.OrdinalIgnoreCase)
     {
-        ("page.bachelors",     new[] { "Alex", "Elliott", "Harvey", "Sam", "Sebastian", "Shane" }),
-        ("page.bachelorettes", new[] { "Abigail", "Emily", "Haley", "Leah", "Maru", "Penny" }),
-        ("page.townspeople",   new[] { "Caroline", "Clint", "Demetrius", "Evelyn", "George", "Gus", "Jodi", "Kent", "Lewis", "Linus", "Marnie", "Pam", "Pierre", "Robin", "Willy" }),
-        ("page.special",       new[] { "Dwarf", "Krobus", "Sandy", "Wizard" }),
+        ["Sophia"] = "A shy and emotionally sensitive vineyard owner from Blue Moon Vineyard. Gentle, anxious, and kind-hearted, she appreciates empathy and calm support.",
+        ["Victor"] = "An intelligent and thoughtful young man from a wealthy family. Polite, reserved, and academically inclined, often introspective and idealistic.",
+        ["Olivia"] = "A refined and confident businesswoman with sophisticated tastes. Elegant, direct, and protective of her family, with a warm side as trust grows.",
+        ["Andy"] = "A hardworking and stubborn farmer who values practical effort and loyalty. Gruff at first, but dependable and sincere underneath.",
+        ["Susan"] = "An independent and straightforward woman focused on her own routine and priorities. Practical, no-nonsense, but fair and authentic.",
+        ["Claire"] = "A polite, overworked employee trying to stay positive under pressure. Friendly, humble, and appreciative of small acts of kindness.",
+        ["Martin"] = "A gentle and enthusiastic younger villager, curious and sincere. Friendly, a little awkward, and eager to connect.",
+        ["Lance"] = "A seasoned adventurer tied to the Adventurer's Guild. Brave, composed, and strategic, with understated humor and strong duty.",
+        ["Morris"] = "An ambitious and image-conscious executive personality. Calculating and persuasive, though capable of nuance depending on the situation.",
+        ["Scarlett"] = "An energetic and social villager with a modern, expressive style. Warm, lively, and quick to engage in conversation.",
+        ["Morgan"] = "A magical child with curious and innocent worldview. Imaginative, playful, and prone to wonder.",
+        ["Apples"] = "A mysterious Junimo-like being with whimsical and curious mannerisms, expressing emotions in a playful and unusual way.",
     };
     private int _activeTab;
 
@@ -64,13 +83,75 @@ public class PersonalityEditorMenu : IClickableMenu
         _monitor = monitor;
         _i18n = i18n;
 
-        // Cache all defaults
-        foreach (var (_, npcs) in Categories)
+        // Build categories dynamically from the API
+        _categories = BuildCategories(api);
+
+        // Cache all defaults and portraits
+        foreach (var (_, npcs) in _categories)
             foreach (var npc in npcs)
-                _defaults.TryAdd(npc, api.GetDefaultPersonality(npc));
+            {
+                var defaultPersonality = SveFallbackPersonalities.TryGetValue(npc, out var sveFallback)
+                    ? sveFallback
+                    : api.GetDefaultPersonality(npc);
+                _defaults.TryAdd(npc, defaultPersonality ?? "");
+                try
+                {
+                    var npcObj = Game1.getCharacterFromName(npc);
+                    _portraits[npc] = npcObj?.Portrait
+                        ?? Game1.content.Load<Texture2D>($"Portraits/{npc}");
+                }
+                catch
+                {
+                    _portraits[npc] = null;
+                }
+            }
 
         RecalculateLayout();
         InitTextBox();
+    }
+
+    private static (string Key, string[] Npcs)[] BuildCategories(IAliveNpcsApi api)
+    {
+        var vanillaNpcs = api.GetVanillaNpcNames().ToList();
+        var sveNpcs = api.GetSveNpcNames().ToList();
+
+        var knownNames = new HashSet<string>(vanillaNpcs.Concat(sveNpcs), StringComparer.OrdinalIgnoreCase);
+
+        // Discover other mod NPCs from game character data
+        var otherNpcs = new List<string>();
+        try
+        {
+            var characterData = Game1.content.Load<Dictionary<string, CharacterData>>("Data/Characters");
+            otherNpcs = characterData
+                .Where(kvp => !knownNames.Contains(kvp.Key) && !string.Equals(kvp.Value.CanSocialize, "FALSE", StringComparison.OrdinalIgnoreCase))
+                .Select(kvp => kvp.Key)
+                .OrderBy(n => n)
+                .ToList();
+        }
+        catch { /* game data not available yet */ }
+
+        var bachelors = vanillaNpcs.Where(n => KnownBachelors.Contains(n)).ToArray();
+        var bachelorettes = vanillaNpcs.Where(n => KnownBachelorettes.Contains(n)).ToArray();
+        var townspeople = vanillaNpcs
+            .Where(n => !KnownBachelors.Contains(n) && !KnownBachelorettes.Contains(n) && !KnownSpecial.Contains(n))
+            .ToArray();
+
+        // Special: gather from vanilla + other (Leo may come from Data/Characters, not the API)
+        var special = vanillaNpcs.Where(n => KnownSpecial.Contains(n))
+            .Concat(otherNpcs.Where(n => KnownSpecial.Contains(n)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        otherNpcs = otherNpcs.Where(n => !KnownSpecial.Contains(n)).ToList();
+
+        var categories = new List<(string Key, string[] Npcs)>();
+        if (bachelors.Length > 0) categories.Add(("page.bachelors", bachelors));
+        if (bachelorettes.Length > 0) categories.Add(("page.bachelorettes", bachelorettes));
+        if (townspeople.Length > 0) categories.Add(("page.townspeople", townspeople));
+        if (special.Length > 0) categories.Add(("page.special", special));
+        if (sveNpcs.Count > 0) categories.Add(("page.sve", sveNpcs.ToArray()));
+        if (otherNpcs.Count > 0) categories.Add(("page.other", otherNpcs.ToArray()));
+
+        return categories.ToArray();
     }
 
     private void RecalculateLayout()
@@ -155,9 +236,9 @@ public class PersonalityEditorMenu : IClickableMenu
     {
         var tabY = yPositionOnScreen + 64;
         var totalW = width - 48;
-        var tabW = totalW / Categories.Length;
+        var tabW = totalW / _categories.Length;
 
-        for (int i = 0; i < Categories.Length; i++)
+        for (int i = 0; i < _categories.Length; i++)
         {
             var rect = new Rectangle(xPositionOnScreen + 24 + i * tabW, tabY, tabW - 4, TabH);
             var active = i == _activeTab;
@@ -166,7 +247,7 @@ public class PersonalityEditorMenu : IClickableMenu
             drawTextureBox(b, Game1.menuTexture, new Rectangle(0, 256, 60, 60),
                 rect.X, rect.Y, rect.Width, rect.Height, color);
 
-            var label = _i18n.Get(Categories[i].Key);
+            var label = _i18n.Get(_categories[i].Key);
             var labelSize = Game1.smallFont.MeasureString(label);
             Utility.drawTextWithShadow(b, label, Game1.smallFont,
                 new Vector2(rect.X + (rect.Width - labelSize.X) / 2f, rect.Y + (rect.Height - labelSize.Y) / 2f),
@@ -176,7 +257,7 @@ public class PersonalityEditorMenu : IClickableMenu
 
     private void DrawCards(SpriteBatch b)
     {
-        var npcs = Categories[_activeTab].Npcs;
+        var npcs = _categories[_activeTab].Npcs;
         var totalH = npcs.Length * (CardH + CardGap) - CardGap;
         _maxScroll = Math.Max(0, totalH - _contentArea.Height);
         _scrollY = Math.Clamp(_scrollY, 0, _maxScroll);
@@ -223,18 +304,14 @@ public class PersonalityEditorMenu : IClickableMenu
         // ── Portrait (left side) ──
         var portraitX = cx + Pad;
         var portraitY = cy + 10;
-        try
-        {
-            var tex = Game1.content.Load<Texture2D>($"Portraits/{npc}");
-            b.Draw(tex, new Rectangle(portraitX, portraitY, PortraitDraw, PortraitDraw),
+        var portrait = _portraits.GetValueOrDefault(npc);
+        if (portrait != null)
+            b.Draw(portrait, new Rectangle(portraitX, portraitY, PortraitDraw, PortraitDraw),
                 new Rectangle(0, 0, PortraitSrc, PortraitSrc), Color.White);
-        }
-        catch
-        {
+        else
             b.Draw(Game1.staminaRect,
                 new Rectangle(portraitX, portraitY, PortraitDraw, PortraitDraw),
                 Color.Black * 0.1f);
-        }
 
         // ── Name below portrait ──
         var nameStr = hasOverride ? $"{npc} *" : npc;
@@ -354,7 +431,7 @@ public class PersonalityEditorMenu : IClickableMenu
 
     private Rectangle GetTabRect(int i)
     {
-        var tabW = (width - 48) / Categories.Length;
+        var tabW = (width - 48) / _categories.Length;
         return new Rectangle(xPositionOnScreen + 24 + i * tabW, yPositionOnScreen + 64, tabW - 4, TabH);
     }
 
@@ -371,7 +448,7 @@ public class PersonalityEditorMenu : IClickableMenu
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
         // Tabs
-        for (int i = 0; i < Categories.Length; i++)
+        for (int i = 0; i < _categories.Length; i++)
         {
             if (GetTabRect(i).Contains(x, y))
             {
@@ -386,7 +463,7 @@ public class PersonalityEditorMenu : IClickableMenu
         }
 
         // Cards
-        var npcs = Categories[_activeTab].Npcs;
+        var npcs = _categories[_activeTab].Npcs;
         for (int i = 0; i < npcs.Length; i++)
         {
             var cardRect = GetCardRect(i);
