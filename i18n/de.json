@@ -1,0 +1,20 @@
+{
+    "editor.title": "AliveNpcs - Persönlichkeits-Editor",
+    "editor.description": "Bearbeite NPC-Persönlichkeiten für die KI-Dialoge von AliveNpcs. Änderungen werden beim nächsten Gespräch wirksam.",
+    "editor.select_prompt": "Klicke auf einen NPC, um seine Persönlichkeit zu bearbeiten.",
+    "page.bachelors": "Junggesellen",
+    "page.bachelorettes": "Junggesellinnen",
+    "page.townspeople": "Dorfbewohner",
+    "page.special": "Besondere",
+    "page.sve": "Stardew Valley Expanded",
+    "field.personality": "Persönlichkeit",
+    "field.personality.tooltip": "Beschreibe {{npcName}}s Persönlichkeit, Eigenschaften und Verhalten für die KI.",
+    "field.editing": "Bearbeitung: {{npcName}}",
+    "field.restore": "Standard wiederherstellen",
+    "field.restore.tooltip": "Markieren und speichern, um die benutzerdefinierte Persönlichkeit zu entfernen und das Original wiederherzustellen.",
+    "button.save": "Speichern",
+    "button.reset": "Zurücksetzen",
+    "button.close": "Schließen",
+    "indicator.custom": "Benutzerdefinierte Persönlichkeit aktiv",
+    "indicator.default": "Standardpersönlichkeit wird verwendet"
+}

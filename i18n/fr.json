@@ -1,0 +1,20 @@
+{
+    "editor.title": "AliveNpcs - Éditeur de Personnalité",
+    "editor.description": "Modifiez les personnalités des PNJ utilisées par les dialogues IA d'AliveNpcs. Les changements prennent effet lors de la prochaine conversation.",
+    "editor.select_prompt": "Cliquez sur un PNJ pour modifier sa personnalité.",
+    "page.bachelors": "Célibataires (H)",
+    "page.bachelorettes": "Célibataires (F)",
+    "page.townspeople": "Habitants",
+    "page.special": "Spéciaux",
+    "page.sve": "Stardew Valley Expanded",
+    "field.personality": "Personnalité",
+    "field.personality.tooltip": "Décrivez la personnalité, les traits et le comportement de {{npcName}} pour l'IA.",
+    "field.editing": "Modification : {{npcName}}",
+    "field.restore": "Restaurer par défaut",
+    "field.restore.tooltip": "Cochez et sauvegardez pour supprimer la personnalité personnalisée et restaurer l'originale.",
+    "button.save": "Sauvegarder",
+    "button.reset": "Réinitialiser",
+    "button.close": "Fermer",
+    "indicator.custom": "Personnalité personnalisée active",
+    "indicator.default": "Utilisation de la personnalité par défaut"
+}

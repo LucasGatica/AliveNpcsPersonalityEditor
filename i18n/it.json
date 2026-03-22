@@ -1,0 +1,20 @@
+{
+    "editor.title": "AliveNpcs - Editor di Personalità",
+    "editor.description": "Modifica le personalità dei PNG usate dai dialoghi IA di AliveNpcs. Le modifiche avranno effetto nella prossima conversazione.",
+    "editor.select_prompt": "Clicca su un PNG per modificare la sua personalità.",
+    "page.bachelors": "Scapoli",
+    "page.bachelorettes": "Nubili",
+    "page.townspeople": "Abitanti",
+    "page.special": "Speciali",
+    "page.sve": "Stardew Valley Expanded",
+    "field.personality": "Personalità",
+    "field.personality.tooltip": "Descrivi la personalità, i tratti e il comportamento di {{npcName}} per l'IA.",
+    "field.editing": "Modifica: {{npcName}}",
+    "field.restore": "Ripristina predefinito",
+    "field.restore.tooltip": "Spunta e salva per rimuovere la personalità personalizzata e ripristinare quella originale.",
+    "button.save": "Salva",
+    "button.reset": "Reimposta",
+    "button.close": "Chiudi",
+    "indicator.custom": "Personalità personalizzata attiva",
+    "indicator.default": "Utilizzo della personalità predefinita"
+}

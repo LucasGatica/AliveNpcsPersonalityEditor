@@ -36,6 +36,6 @@ public sealed class ModEntry : Mod
         if (e.Button != _config.OpenEditorKey) return;
         if (Game1.activeClickableMenu != null) return;
 
-        Game1.activeClickableMenu = new PersonalityEditorMenu(_store, _api, Monitor);
+        Game1.activeClickableMenu = new PersonalityEditorMenu(_store, _api, Monitor, Helper.Translation);
     }
 }

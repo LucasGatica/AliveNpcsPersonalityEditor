@@ -1,15 +1,20 @@
 {
     "editor.title": "AliveNpcs - Personality Editor",
     "editor.description": "Edit NPC personalities used by AliveNpcs AI dialogue. Changes take effect on the next conversation.",
+    "editor.select_prompt": "Click on an NPC to edit their personality.",
     "page.bachelors": "Bachelors",
     "page.bachelorettes": "Bachelorettes",
     "page.townspeople": "Townspeople",
     "page.special": "Special",
     "page.sve": "Stardew Valley Expanded",
     "field.personality": "Personality",
-    "field.personality.tooltip": "Describe {0}'s personality, traits, and behavior for the AI.",
+    "field.personality.tooltip": "Describe {{npcName}}'s personality, traits, and behavior for the AI.",
+    "field.editing": "Editing: {{npcName}}",
     "field.restore": "Restore default",
     "field.restore.tooltip": "Check and save to remove custom personality and restore the original.",
+    "button.save": "Save",
+    "button.reset": "Reset",
+    "button.close": "Close",
     "indicator.custom": "Custom personality active",
     "indicator.default": "Using default personality"
 }

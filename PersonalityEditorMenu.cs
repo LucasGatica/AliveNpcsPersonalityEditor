@@ -12,15 +12,16 @@ public class PersonalityEditorMenu : IClickableMenu
     private readonly PersonalityStore _store;
     private readonly IAliveNpcsApi _api;
     private readonly IMonitor _monitor;
+    private readonly ITranslationHelper _i18n;
     private readonly Dictionary<string, string> _defaults = new(StringComparer.OrdinalIgnoreCase);
 
     // ── Categories ──
-    private static readonly (string Label, string[] Npcs)[] Categories =
+    private static readonly (string Key, string[] Npcs)[] Categories =
     {
-        ("Bachelors",     new[] { "Alex", "Elliott", "Harvey", "Sam", "Sebastian", "Shane" }),
-        ("Bachelorettes", new[] { "Abigail", "Emily", "Haley", "Leah", "Maru", "Penny" }),
-        ("Townspeople",   new[] { "Caroline", "Clint", "Demetrius", "Evelyn", "George", "Gus", "Jodi", "Kent", "Lewis", "Linus", "Marnie", "Pam", "Pierre", "Robin", "Willy" }),
-        ("Special",       new[] { "Dwarf", "Krobus", "Sandy", "Wizard" }),
+        ("page.bachelors",     new[] { "Alex", "Elliott", "Harvey", "Sam", "Sebastian", "Shane" }),
+        ("page.bachelorettes", new[] { "Abigail", "Emily", "Haley", "Leah", "Maru", "Penny" }),
+        ("page.townspeople",   new[] { "Caroline", "Clint", "Demetrius", "Evelyn", "George", "Gus", "Jodi", "Kent", "Lewis", "Linus", "Marnie", "Pam", "Pierre", "Robin", "Willy" }),
+        ("page.special",       new[] { "Dwarf", "Krobus", "Sandy", "Wizard" }),
     };
     private int _activeTab;
 
@@ -55,12 +56,13 @@ public class PersonalityEditorMenu : IClickableMenu
     private static readonly Color BtnSave = new(90, 160, 70);
     private static readonly Color BtnReset = new(190, 90, 70);
 
-    public PersonalityEditorMenu(PersonalityStore store, IAliveNpcsApi api, IMonitor monitor)
+    public PersonalityEditorMenu(PersonalityStore store, IAliveNpcsApi api, IMonitor monitor, ITranslationHelper i18n)
         : base(0, 0, 0, 0)
     {
         _store = store;
         _api = api;
         _monitor = monitor;
+        _i18n = i18n;
 
         // Cache all defaults
         foreach (var (_, npcs) in Categories)
@@ -142,7 +144,7 @@ public class PersonalityEditorMenu : IClickableMenu
 
     private void DrawTitle(SpriteBatch b)
     {
-        const string title = "Personality Editor";
+        var title = _i18n.Get("editor.title");
         var size = Game1.dialogueFont.MeasureString(title);
         Utility.drawTextWithShadow(b, title, Game1.dialogueFont,
             new Vector2(xPositionOnScreen + (width - size.X) / 2f, yPositionOnScreen + 18),
@@ -164,7 +166,7 @@ public class PersonalityEditorMenu : IClickableMenu
             drawTextureBox(b, Game1.menuTexture, new Rectangle(0, 256, 60, 60),
                 rect.X, rect.Y, rect.Width, rect.Height, color);
 
-            var label = Categories[i].Label;
+            var label = _i18n.Get(Categories[i].Key);
             var labelSize = Game1.smallFont.MeasureString(label);
             Utility.drawTextWithShadow(b, label, Game1.smallFont,
                 new Vector2(rect.X + (rect.Width - labelSize.X) / 2f, rect.Y + (rect.Height - labelSize.Y) / 2f),
@@ -278,7 +280,7 @@ public class PersonalityEditorMenu : IClickableMenu
         if (_editingNpc != null)
         {
             // Label
-            Utility.drawTextWithShadow(b, $"Editing: {_editingNpc}", Game1.smallFont,
+            Utility.drawTextWithShadow(b, _i18n.Get("field.editing", new { npcName = _editingNpc }), Game1.smallFont,
                 new Vector2(_editArea.X + 12, _editArea.Y + 10), Color.White);
 
             // Text preview (4 lines, word-wrapped) below the label
@@ -303,18 +305,18 @@ public class PersonalityEditorMenu : IClickableMenu
 
             // Buttons below textbox
             var btnY = _textBox.Y + 48 + 6;
-            DrawButton(b, GetSaveRect(btnY), "Save", BtnSave);
-            DrawButton(b, GetResetRect(btnY), "Reset", BtnReset);
-            DrawButton(b, GetCloseRect(btnY), "Close", new Color(120, 100, 80));
+            DrawButton(b, GetSaveRect(btnY), _i18n.Get("button.save"), BtnSave);
+            DrawButton(b, GetResetRect(btnY), _i18n.Get("button.reset"), BtnReset);
+            DrawButton(b, GetCloseRect(btnY), _i18n.Get("button.close"), new Color(120, 100, 80));
         }
         else
         {
-            Utility.drawTextWithShadow(b, "Click on an NPC to edit their personality.",
+            Utility.drawTextWithShadow(b, _i18n.Get("editor.select_prompt"),
                 Game1.smallFont, new Vector2(_editArea.X + 12, _editArea.Y + 60), Color.Wheat);
 
             // Close button
             var btnY = _editArea.Bottom - 52;
-            DrawButton(b, GetCloseRect(btnY), "Close", new Color(120, 100, 80));
+            DrawButton(b, GetCloseRect(btnY), _i18n.Get("button.close"), new Color(120, 100, 80));
         }
     }
 
