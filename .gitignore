@@ -9,8 +9,9 @@ x86/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
-[Bb]in/
 [Oo]bj/
+obj/
+[Bb]in/
 [Ll]og/
 [Ll]ogs/
 
