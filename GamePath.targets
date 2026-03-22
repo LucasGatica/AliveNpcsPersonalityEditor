@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <GamePath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley</GamePath>
+    <GameModsDir>$(GamePath)\Mods</GameModsDir>
+    <EnableModDeploy>true</EnableModDeploy>
+  </PropertyGroup>
+</Project>
