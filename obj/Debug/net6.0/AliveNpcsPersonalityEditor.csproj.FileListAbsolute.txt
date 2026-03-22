@@ -1,8 +1,0 @@
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\bin\Debug\net6.0\AliveNpcsPersonalityEditor.deps.json
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\bin\Debug\net6.0\AliveNpcsPersonalityEditor.dll
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\obj\Debug\net6.0\AliveNpcsPersonalityEditor.csproj.AssemblyReference.cache
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\obj\Debug\net6.0\AliveNpcsPersonalityEditor.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\obj\Debug\net6.0\AliveNpcsPersonalityEditor.AssemblyInfoInputs.cache
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\obj\Debug\net6.0\AliveNpcsPersonalityEditor.AssemblyInfo.cs
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\obj\Debug\net6.0\AliveNpcsPersonalityEditor.csproj.CoreCompileInputs.cache
-C:\Users\lucas\OneDrive\Documentos\AliveNpcsPersonalityEditor\obj\Debug\net6.0\AliveNpcsPersonalityEditor.dll
