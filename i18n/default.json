@@ -1,0 +1,15 @@
+{
+    "editor.title": "AliveNpcs - Editor de Personalidades",
+    "editor.description": "Edite as personalidades dos NPCs usadas pelo dialogo IA do AliveNpcs. As mudancas fazem efeito na proxima conversa.",
+    "page.bachelors": "Solteiros",
+    "page.bachelorettes": "Solteiras",
+    "page.townspeople": "Moradores",
+    "page.special": "Especiais",
+    "page.sve": "Stardew Valley Expanded",
+    "field.personality": "Personalidade",
+    "field.personality.tooltip": "Descreva a personalidade, tracos e comportamento de {0} para a IA.",
+    "field.restore": "Restaurar padrao",
+    "field.restore.tooltip": "Marque e salve para remover a personalidade customizada e restaurar a original.",
+    "indicator.custom": "Personalidade customizada ativa",
+    "indicator.default": "Usando personalidade padrao"
+}

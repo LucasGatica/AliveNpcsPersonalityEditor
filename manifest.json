@@ -1,0 +1,22 @@
+{
+    "Name": "AliveNpcs Personality Editor",
+    "Author": "Lucas Gatica",
+    "Version": "1.0.0",
+    "Description": "Visual GMCM editor for NPC personalities used by AliveNpcs.",
+    "UniqueID": "Lucas.AliveNpcsPersonalityEditor",
+    "EntryDll": "AliveNpcsPersonalityEditor.dll",
+    "MinimumApiVersion": "4.0.0",
+    "Dependencies": [
+        {
+            "UniqueID": "Lucas.AliveNpcs",
+            "MinimumVersion": "1.1.6",
+            "IsRequired": true
+        },
+        {
+            "UniqueID": "spacechase0.GenericModConfigMenu",
+            "MinimumVersion": "1.6.0",
+            "IsRequired": true
+        }
+    ],
+    "UpdateKeys": []
+}
