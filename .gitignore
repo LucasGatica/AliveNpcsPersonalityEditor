@@ -23,6 +23,7 @@ bld/
 
 # Rider
 .idea/
+.obj/
 *.sln.iml
 *.DotSettings.user
 
