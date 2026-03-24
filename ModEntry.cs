@@ -20,6 +20,14 @@ public sealed class ModEntry : Mod
         helper.Events.Input.ButtonPressed += OnButtonPressed;
     }
 
+    public override object GetApi() => new PersonalityEditorApi(this);
+
+    public void OpenEditorMenu()
+    {
+        if (_api == null || !Context.IsWorldReady) return;
+        Game1.activeClickableMenu = new PersonalityEditorMenu(_store, _api, Monitor, Helper.Translation);
+    }
+
     private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
     {
         _api = Helper.ModRegistry.GetApi<IAliveNpcsApi>("Lucas.AliveNpcs");
