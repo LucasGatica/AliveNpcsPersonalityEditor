@@ -1,8 +1,8 @@
 {
     "Name": "AliveNpcs Personality Editor",
     "Author": "Lucas Gatica",
-    "Version": "1.0.0",
-    "Description": "Visual GMCM editor for NPC personalities used by AliveNpcs.",
+    "Version": "1.0.1",
+    "Description": "Aumentando tamanho do input de personalidade dos NPCs para 2000 caracteres, permitindo uma personalização mais detalhada.",
     "UniqueID": "Lucas.AliveNpcsPersonalityEditor",
     "EntryDll": "AliveNpcsPersonalityEditor.dll",
     "MinimumApiVersion": "4.0.0",

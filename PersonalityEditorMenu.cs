@@ -181,7 +181,9 @@ public class PersonalityEditorMenu : IClickableMenu
             X = _editArea.X + 12,
             Y = _editArea.Y + 32,
             Width = _editArea.Width - 24,
-            Text = ""
+            Text = "",
+            textLimit = 10000,
+            limitWidth = false
         };
     }
 
@@ -471,7 +473,7 @@ public class PersonalityEditorMenu : IClickableMenu
             {
                 CommitCurrentEdit();
                 _editingNpc = npcs[i];
-                _textBox.Text = GetCurrentText(npcs[i]);
+                _textBox.Text = NormalizeForSingleLineEditor(GetCurrentText(npcs[i]));
                 SubscribeTextBox();
                 Game1.playSound("smallSelect");
                 return;
@@ -494,7 +496,7 @@ public class PersonalityEditorMenu : IClickableMenu
         if (_editingNpc != null && GetResetRect(btnY).Contains(x, y))
         {
             _store.Set(_editingNpc, null);
-            _textBox.Text = _defaults.GetValueOrDefault(_editingNpc, "");
+            _textBox.Text = NormalizeForSingleLineEditor(_defaults.GetValueOrDefault(_editingNpc, ""));
             _store.Save();
             NotifyReload();
             Game1.playSound("trashcan");
@@ -547,11 +549,23 @@ public class PersonalityEditorMenu : IClickableMenu
         return _store.Get(npcName) ?? _defaults.GetValueOrDefault(npcName, "");
     }
 
+    private static string NormalizeForSingleLineEditor(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return "";
+
+        return text
+            .Replace("\r\n", " ", StringComparison.Ordinal)
+            .Replace('\n', ' ')
+            .Replace('\r', ' ')
+            .Trim();
+    }
+
     private void CommitCurrentEdit()
     {
         if (_editingNpc == null) return;
-        var text = _textBox.Text?.Trim() ?? "";
-        var def = _defaults.GetValueOrDefault(_editingNpc, "");
+        var text = NormalizeForSingleLineEditor(_textBox.Text);
+        var def = NormalizeForSingleLineEditor(_defaults.GetValueOrDefault(_editingNpc, ""));
 
         if (string.IsNullOrWhiteSpace(text) ||
             string.Equals(text, def, StringComparison.OrdinalIgnoreCase))
