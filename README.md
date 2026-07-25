@@ -2,23 +2,26 @@
 
 An in-game editor for the NPC personality profiles used by [AliveNpcs](https://www.nexusmods.com/stardewvalley/mods/43475).
 
-It is a standalone companion mod: install it alongside AliveNpcs, then press `F10` in a loaded save to write, save, or reset personality overrides without editing JSON by hand.
+It is a standalone companion mod: install it alongside AliveNpcs, then press `F10` in a loaded save to edit NPC profiles without editing JSON by hand. Press `F7` to open the farmer character sheet directly.
 
 ## Requirements
 
 - Stardew Valley 1.6+
 - SMAPI 4.0+
-- AliveNpcs 1.4.3+
+- AliveNpcs 1.4.5+
 
 Generic Mod Config Menu is not required. AliveNpcs itself still needs its normal AI-provider configuration.
 
 ## Features
 
-- Stardew-style menu with NPC portraits and current-profile previews.
-- Configurable editor hotkey (`F10` by default).
-- Tabs for vanilla NPCs, enabled SVE NPCs, and compatible custom NPCs.
+- Full-screen Stardew-style menu with **Farmer**, **NPCs**, and **Catalog** tabs.
+- Portrait grid for every NPC currently accepted by the AliveNpcs compatibility API.
+- Per-NPC checkbox to disable or re-enable all AliveNpcs interactions while preserving base-game dialogue.
+- NPC editor for appearance, personality, lore, social tags, gender, manners, social anxiety, optimism, socialization, and romance availability.
+- Farmer character sheet editor backed by the same save-specific file used by AliveNpcs.
+- Community catalog search, preview, import, upload, and optional owner deletion.
+- Configurable NPC editor (`F10`) and farmer sheet (`F7`) hotkeys.
 - Immediate AliveNpcs reload after a save; the next AI conversation can use the new profile.
-- Reset removes only the override and restores the AliveNpcs default profile.
 - Localized UI: English, Brazilian Portuguese, Spanish, French, German, and Italian.
 - Safe file replacement when saving personality data.
 
@@ -37,17 +40,21 @@ The first launch creates `config.json` in the mod folder:
 
 ```json
 {
-  "OpenEditorKey": "F10"
+  "OpenEditorKey": "F10",
+  "OpenFarmerTabKey": "F7",
+  "OverrideCharacterSheet": true,
+  "GalleryServerUrl": "http://localhost:3000",
+  "GalleryEnabled": true
 }
 ```
 
-Change `F10` to any valid SMAPI button name.
+Hotkeys accept any valid SMAPI button name. Set `GalleryEnabled` to `false` when no catalog server is available.
 
 ## Data and multiplayer
 
-Overrides live in `custom_personalities.json` in the editor's own mod folder. The file is global to that game installation, so it applies to every save on that computer. It can be backed up or copied to another installation.
+NPC overrides live as one JSON file per NPC in the editor's `overrides` folder. They are global to that game installation and can be backed up or copied to another installation. Farmer sheets remain save-specific under the AliveNpcs `Data/<saveId>/character_sheet.json` path.
 
-In multiplayer, players who want the same personality profiles should use the same data file. The editor does not change vanilla dialogue, schedules, portraits, heart events, friendship values, or existing AliveNpcs memories.
+In multiplayer, players who want the same NPC profiles should use the same override files. The editor does not change vanilla dialogue, schedules, portraits, heart events, friendship values, or existing AliveNpcs memories.
 
 ## Writing profiles
 

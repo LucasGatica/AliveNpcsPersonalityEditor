@@ -1,109 +1,216 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AliveNpcsPersonalityEditor.Models;
 using StardewModdingAPI;
 
 namespace AliveNpcsPersonalityEditor;
 
-/// <summary>Reads and writes the custom_personalities.json file.</summary>
+/// <summary>Reads and writes per-NPC override JSON files in the overrides/ directory.</summary>
 public sealed class PersonalityStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    private readonly string _filePath;
+    private const string OverridesDirName = "overrides";
+    private const string LegacyDataFileName = "custom_personalities.json";
+
+    private readonly string _overridesDir;
+    private readonly string _legacyFilePath;
     private readonly IMonitor _monitor;
+    private bool _migratedFromLegacy;
 
-    /// <summary>Current custom overrides (NPC name -> personality text). Only contains edited NPCs.</summary>
-    public Dictionary<string, string> Overrides { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Current custom overrides (NPC name -> structured override). Only contains edited NPCs.</summary>
+    public Dictionary<string, NpcOverrideEntry> Overrides { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Absolute path of the data file consumed by AliveNpcs.</summary>
-    public string FilePath => _filePath;
+    /// <summary>Absolute path of the overrides directory consumed by AliveNpcs.</summary>
+    public string OverridesDirectory => _overridesDir;
 
     public PersonalityStore(string modDirectoryPath, IMonitor monitor)
     {
-        _filePath = Path.Combine(modDirectoryPath, "custom_personalities.json");
+        _overridesDir = Path.Combine(modDirectoryPath, OverridesDirName);
+        _legacyFilePath = Path.Combine(modDirectoryPath, LegacyDataFileName);
         _monitor = monitor;
     }
 
     public void Load()
     {
-        if (!File.Exists(_filePath))
+        var dict = new Dictionary<string, NpcOverrideEntry>(StringComparer.OrdinalIgnoreCase);
+        _migratedFromLegacy = false;
+
+        if (Directory.Exists(_overridesDir))
         {
-            Overrides = new(StringComparer.OrdinalIgnoreCase);
-            return;
+            foreach (var file in Directory.EnumerateFiles(_overridesDir, "*.json"))
+            {
+                var npcName = Path.GetFileNameWithoutExtension(file);
+                if (string.IsNullOrWhiteSpace(npcName))
+                    continue;
+
+                try
+                {
+                    var json = File.ReadAllText(file);
+                    var entry = JsonSerializer.Deserialize<NpcOverrideEntry>(json, JsonOptions);
+                    if (entry != null && entry.HasAnyField)
+                    {
+                        entry.NpcName = npcName;
+                        dict[npcName] = entry;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _monitor.Log($"Failed to read override file '{Path.GetFileName(file)}': {ex.Message}", LogLevel.Warn);
+                }
+            }
         }
 
-        try
+        if (dict.Count == 0 && File.Exists(_legacyFilePath))
         {
-            var json = File.ReadAllText(_filePath);
-            var data = JsonSerializer.Deserialize<CustomPersonalityData>(json, JsonOptions);
-            Overrides = data?.Personalities?
-                .Where(entry => !string.IsNullOrWhiteSpace(entry.Key) && !string.IsNullOrWhiteSpace(entry.Value))
-                .ToDictionary(entry => entry.Key.Trim(), entry => entry.Value.Trim(), StringComparer.OrdinalIgnoreCase)
-                ?? new(StringComparer.OrdinalIgnoreCase);
-            _monitor.Log($"Loaded {Overrides.Count} custom personality override(s).", LogLevel.Info);
+            _migratedFromLegacy = true;
+            try
+            {
+                var json = File.ReadAllText(_legacyFilePath);
+                var legacyData = JsonSerializer.Deserialize<LegacyPersonalityData>(json, JsonOptions);
+                if (legacyData?.Personalities != null)
+                {
+                    foreach (var (npcName, text) in legacyData.Personalities)
+                    {
+                        if (!string.IsNullOrWhiteSpace(text))
+                            dict[npcName] = new NpcOverrideEntry { NpcName = npcName, CanonicalPersonality = text.Trim() };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _monitor.Log($"Failed to read legacy custom_personalities.json: {ex.Message}", LogLevel.Warn);
+            }
         }
-        catch (Exception ex)
-        {
-            _monitor.Log($"Failed to load custom personalities: {ex.Message}", LogLevel.Warn);
-            Overrides = new(StringComparer.OrdinalIgnoreCase);
-        }
+
+        Overrides = dict;
+        _monitor.Log($"Loaded {Overrides.Count} custom personality override(s).", LogLevel.Info);
     }
 
     public void Save()
     {
         try
         {
-            var data = new CustomPersonalityData
+            Directory.CreateDirectory(_overridesDir);
+
+            var existingFiles = Directory.Exists(_overridesDir)
+                ? new HashSet<string>(Directory.EnumerateFiles(_overridesDir, "*.json"), StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (npcName, entry) in Overrides)
             {
-                SchemaVersion = 1,
-                LastModified = DateTime.UtcNow.ToString("o"),
-                Personalities = new Dictionary<string, string>(Overrides, StringComparer.OrdinalIgnoreCase)
-            };
-            var json = JsonSerializer.Serialize(data, JsonOptions);
-            var tempPath = _filePath + ".tmp";
-            File.WriteAllText(tempPath, json);
-            File.Move(tempPath, _filePath, overwrite: true);
+                if (!entry.HasAnyField)
+                    continue;
+
+                var filePath = Path.Combine(_overridesDir, $"{npcName}.json");
+                entry.NpcName = npcName;
+                var json = JsonSerializer.Serialize(entry, JsonOptions);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, filePath, overwrite: true);
+                existingFiles.Remove(filePath);
+            }
+
+            foreach (var staleFile in existingFiles)
+            {
+                try { File.Delete(staleFile); }
+                catch { /* best effort */ }
+            }
+
+            if (_migratedFromLegacy && File.Exists(_legacyFilePath))
+            {
+                try
+                {
+                    var bakPath = _legacyFilePath + ".bak";
+                    File.Move(_legacyFilePath, bakPath, overwrite: true);
+                    _monitor.Log("Migrated legacy custom_personalities.json → per-NPC files. Original backed up as .bak.", LogLevel.Info);
+                    _migratedFromLegacy = false;
+                }
+                catch { /* migration cleanup is best-effort */ }
+            }
+
             _monitor.Log($"Saved {Overrides.Count} custom personality override(s).", LogLevel.Info);
         }
         catch (Exception ex)
         {
-            TryDeleteTempFile();
             _monitor.Log($"Failed to save custom personalities: {ex.Message}", LogLevel.Error);
         }
     }
 
-    /// <summary>Set or clear a custom override. Pass null to remove.</summary>
-    public void Set(string npcName, string? value)
+    public void Save(string npcName)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        try
+        {
+            Directory.CreateDirectory(_overridesDir);
+
+            if (Overrides.TryGetValue(npcName, out var entry) && entry.HasAnyField)
+            {
+                var filePath = Path.Combine(_overridesDir, $"{npcName}.json");
+                entry.NpcName = npcName;
+                var json = JsonSerializer.Serialize(entry, JsonOptions);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, filePath, overwrite: true);
+            }
+            else
+            {
+                DeleteFile(npcName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"Failed to save override for {npcName}: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    public void Delete(string npcName)
+    {
+        Overrides.Remove(npcName);
+        DeleteFile(npcName);
+    }
+
+    private void DeleteFile(string npcName)
+    {
+        var filePath = Path.Combine(_overridesDir, $"{npcName}.json");
+        try
+        {
+            if (File.Exists(filePath))
+                File.Delete(filePath);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Set or clear a custom override. Pass null to remove.</summary>
+    public void Set(string npcName, NpcOverrideEntry? value)
+    {
+        if (value == null || !value.HasAnyField)
             Overrides.Remove(npcName);
         else
             Overrides[npcName] = value;
     }
 
     /// <summary>Get the custom override for an NPC, or null if not overridden.</summary>
-    public string? Get(string npcName)
+    public NpcOverrideEntry? Get(string npcName)
     {
         return Overrides.TryGetValue(npcName, out var val) ? val : null;
     }
 
-    public bool HasOverride(string npcName) => Overrides.ContainsKey(npcName);
+    public bool HasOverride(string npcName) => Overrides.TryGetValue(npcName, out var entry) && entry.HasAnyField;
 
-    private void TryDeleteTempFile()
+    private sealed class LegacyPersonalityData
     {
-        try
-        {
-            var tempPath = _filePath + ".tmp";
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
-        }
-        catch
-        {
-            // The original file is still intact; a future save can replace the temp file.
-        }
+        [JsonPropertyName("schemaVersion")]
+        public int SchemaVersion { get; set; }
+
+        [JsonPropertyName("lastModified")]
+        public string LastModified { get; set; } = "";
+
+        [JsonPropertyName("personalities")]
+        public Dictionary<string, string> Personalities { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

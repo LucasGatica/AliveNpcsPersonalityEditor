@@ -16,4 +16,9 @@ public class PersonalityEditorApi
     {
         _mod.OpenEditorMenu();
     }
+
+    public void OpenFarmerTab()
+    {
+        _mod.OpenFarmerTab();
+    }
 }
