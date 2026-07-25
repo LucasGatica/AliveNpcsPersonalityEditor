@@ -80,6 +80,17 @@ public sealed class ModEntry : Mod
         Helper.Events.Content.AssetRequested += _characterDataService.OnAssetRequested;
         Helper.Events.GameLoop.SaveLoaded += OnSaveLoadedReportCdConflicts;
 
+        // Push CD diagnostics (detected external changes + originals) to AliveNpcs for the prompt builder.
+        _characterDataService.OnDiagnosticsReady((detected, originals) =>
+        {
+            try { _api?.SetCharacterDataDiagnostics(detected, originals); }
+            catch (Exception ex) { Monitor.Log($"Could not push CD diagnostics: {ex.Message}", LogLevel.Trace); }
+        });
+
+        // Visual layer: swap the dialogue portrait name to the overridden name (with "Originally X" tooltip).
+        PortraitNamePatches.Initialise(Monitor, Helper.Translation, () => _store.Overrides, () => _config.IncludeCharacterDataInPrompt);
+        PortraitNamePatches.Apply(new HarmonyLib.Harmony(ModManifest.UniqueID + ".PortraitName"));
+
         RegisterGmcmConfig();
         PushCharacterDataPromptSetting();
 
