@@ -55,6 +55,12 @@ public interface IAliveNpcsApi
     void SetCharacterDataPromptEnabled(bool enabled);
 
     /// <summary>
+    /// When true, the editor overrides the in-game character sheet menu (F7). AliveNpcs should
+    /// NOT open its own CharacterSheetMenu, letting the editor handle the keybind instead.
+    /// </summary>
+    void SetCharacterSheetOverrideEnabled(bool enabled);
+
+    /// <summary>
     /// Push CharacterData diagnostics detected by the Personality Manager so the prompt builder
     /// can include other mods' changes in the identity/pronoun block.
     /// detected = npcName → { field: value } for external changes.

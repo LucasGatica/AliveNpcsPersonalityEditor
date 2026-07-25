@@ -93,6 +93,7 @@ public sealed class ModEntry : Mod
 
         RegisterGmcmConfig();
         PushCharacterDataPromptSetting();
+        PushCharacterSheetOverrideSetting();
 
         Monitor.Log($"Personality Editor ready. Press {_config.OpenFarmerTabKey} for Farmer tab, {_config.OpenEditorKey} for NPCs/Catalog.", LogLevel.Info);
     }
@@ -101,6 +102,12 @@ public sealed class ModEntry : Mod
     {
         try { _api?.SetCharacterDataPromptEnabled(_config.IncludeCharacterDataInPrompt); }
         catch (Exception ex) { Monitor.Log($"Could not push CharacterData prompt setting: {ex.Message}", LogLevel.Trace); }
+    }
+
+    private void PushCharacterSheetOverrideSetting()
+    {
+        try { _api?.SetCharacterSheetOverrideEnabled(_config.OverrideCharacterSheet); }
+        catch (Exception ex) { Monitor.Log($"Could not push character sheet override setting: {ex.Message}", LogLevel.Trace); }
     }
 
     private void OnCharacterDataRestored()
@@ -169,6 +176,7 @@ public sealed class ModEntry : Mod
                 else
                     _galleryService = null;
                 PushCharacterDataPromptSetting();
+                PushCharacterSheetOverrideSetting();
             });
 
             gmcm.AddSectionTitle(modManifest, () => Helper.Translation.Get("config.chardata.section"));
