@@ -59,9 +59,25 @@ public sealed class GalleryPane
 
     private const int DiscoverH = 44;
     private const int SearchH = 40;
-    private const int CardSize = 194;
+    private const int CardSize = 240;
     private const int CardRowGap = 32;
     private const int MaxCardGap = 40;   // cap the horizontal gap so wide grids don't spread cards apart
+
+    // Card internal band heights (top → bottom). Content area = 240 - 16*2 = 208px usable.
+    // 28 + 84 + 52 + 24 + 8(gap) + 4(pad) = 200, fits comfortably.
+    private const int CardHeaderH = 28;   // name band
+    private const int CardPortraitH = 84; // portrait band (72px portrait + 6px padding each side)
+    private const int CardPreviewH = 52;  // preview text band (2 lines of tinyFont + padding)
+    private const int CardGapH = 8;       // gap between preview and credit
+    private const int CardCreditH = 22;  // author credit band
+    // Inset from the frame edge so bands/dividers never overlay the 9-slice corners.
+    private const int CardInset = EditorTheme.FramePad; // 16px
+
+    private static readonly Color PreviewTextColor = new(90, 60, 35);   // warm dark brown
+    private static readonly Color CreditTextColor = new(74, 45, 20);    // dark brown, high contrast
+    private static readonly Color HeaderBandColor = new(210, 180, 138); // slightly darker header band
+    private static readonly Color CreditBandColor = new(232, 205, 163); // slightly lighter credit band
+    private static readonly Color DividerColor = new(0, 0, 0, 38);      // 15% black for section dividers
     private static readonly Color Active = new(235, 155, 45);
     private static readonly Color Paper = new(255, 248, 234);
     private static readonly Color Border = new(125, 60, 40);
@@ -296,7 +312,7 @@ public sealed class GalleryPane
             _hasMore = true;
             _scrollY = 0;
             _ = FetchPageAsync();                   // reload from the new server
-            Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.server.saved"), 3));
+            EditorNotify.Success(_i18n.Get("gallery.server.saved"));
         }
         CloseServerEditor();
     }
@@ -416,30 +432,53 @@ public sealed class GalleryPane
     {
         EditorTheme.DrawFrame(b, rect, CardBg);
 
-        var nameSize = Game1.smallFont.MeasureString(preset.NpcName);
-        Utility.drawTextWithShadow(b, preset.NpcName, Game1.smallFont,
-            new Vector2(rect.X + (rect.Width - nameSize.X) / 2f, rect.Y + 8), Color.Black);
+        var innerX = rect.X + CardInset;
+        var innerW = rect.Width - CardInset * 2;
+        var contentTop = rect.Y + CardInset;
+        var contentBottom = rect.Bottom - CardInset;
 
-        const int portraitSize = 64;
-        var portraitRect = new Rectangle(rect.X + (rect.Width - portraitSize) / 2, rect.Y + 34, portraitSize, portraitSize);
+        // Header band — name vertically centered in 28px
+        var headerY = contentTop;
+        DrawBandInset(b, rect, headerY, CardHeaderH, HeaderBandColor);
+
+        var nameSize = Game1.smallFont.MeasureString(preset.NpcName);
+        var nameY = headerY + (CardHeaderH - nameSize.Y) / 2f;
+        Utility.drawTextWithShadow(b, preset.NpcName, Game1.smallFont,
+            new Vector2(rect.X + (rect.Width - nameSize.X) / 2f, nameY), Color.Black);
+
+        DrawDivider(b, headerY + CardHeaderH, innerX, innerW);
+
+        // Portrait band — 72px centered in 84px
+        const int portraitSize = 72;
+        var portraitY = headerY + CardHeaderH + (CardPortraitH - portraitSize) / 2;
+        var portraitRect = new Rectangle(rect.X + (rect.Width - portraitSize) / 2, portraitY, portraitSize, portraitSize);
         PortraitDraw.Draw(b, portraitRect, preset.NpcName, _portraits.GetValueOrDefault(preset.NpcName));
 
-        // Description preview (two lines), same as the Local cards.
+        // Preview band
+        var previewY = headerY + CardHeaderH + CardPortraitH;
+        DrawDivider(b, previewY, innerX, innerW);
+
         var preview = string.IsNullOrWhiteSpace(preset.Preview) ? "" : preset.Preview;
         if (!string.IsNullOrWhiteSpace(preview))
         {
-            var wrapped = Game1.parseText(preview, Game1.smallFont, rect.Width - 20);
+            var wrapWidth = innerW - 8;
+            var wrapped = Game1.parseText(preview, Game1.tinyFont, wrapWidth);
             var lines = wrapped.Split('\n');
             if (lines.Length > 2)
                 wrapped = string.Join("\n", lines.Take(2)).TrimEnd() + "…";
-            b.DrawString(Game1.smallFont, wrapped, new Vector2(rect.X + 10, rect.Y + 106), Color.Black * 0.7f);
+            b.DrawString(Game1.tinyFont, wrapped, new Vector2(innerX + 4, previewY + 5), PreviewTextColor);
         }
 
-        // Author centered across the bottom frame, yellow so it reads on the brown border.
+        // Credit band — gap between preview and credit
+        var creditY = contentBottom - CardCreditH;
+        DrawBandInset(b, rect, creditY, CardCreditH, CreditBandColor);
+        DrawDivider(b, creditY, innerX, innerW);
+
         var author = _i18n.Get("gallery.card.by", new { author = preset.Author }).ToString();
-        var aSize = Game1.tinyFont.MeasureString(author);
-        var aPos = new Vector2(rect.X + (rect.Width - aSize.X) / 2f, rect.Bottom - aSize.Y - 8);
-        Utility.drawTextWithShadow(b, author, Game1.tinyFont, aPos, Color.Yellow);
+        var aScale = 0.75f;
+        var aSize = Game1.tinyFont.MeasureString(author) * aScale;
+        var aPos = new Vector2(rect.X + (rect.Width - aSize.X) / 2f, creditY + (CardCreditH - aSize.Y) / 2f);
+        Utility.drawTextWithShadow(b, author, Game1.tinyFont, aPos, CreditTextColor, aScale);
 
         if (preset.HasCharacterData)
             EditorTheme.DrawCharacterDataBadge(b, rect, _i18n.Get("indicator.character_data").ToString());
@@ -447,6 +486,15 @@ public sealed class GalleryPane
 
     private static void DrawButton(SpriteBatch b, Rectangle rect, string label, Color background)
         => EditorTheme.DrawButton(b, rect, label, background, Color.Black);
+
+    private static void DrawBandInset(SpriteBatch b, Rectangle card, int y, int height, Color color)
+    {
+        var band = new Rectangle(card.X + CardInset, y, card.Width - CardInset * 2, height);
+        b.Draw(Game1.staminaRect, band, color);
+    }
+
+    private static void DrawDivider(SpriteBatch b, int y, int x, int width)
+        => b.Draw(Game1.staminaRect, new Rectangle(x, y, width, 1), DividerColor);
 
     // ── Local presets (Manage) mode ─────────────────────────────────────────
 
@@ -530,13 +578,31 @@ public sealed class GalleryPane
     {
         EditorTheme.DrawFrame(b, rect, CardBg);
 
-        var nameSize = Game1.smallFont.MeasureString(preset.Npc);
-        Utility.drawTextWithShadow(b, preset.Npc, Game1.smallFont,
-            new Vector2(rect.X + (rect.Width - nameSize.X) / 2f, rect.Y + 8), Color.Black);
+        var innerX = rect.X + CardInset;
+        var innerW = rect.Width - CardInset * 2;
+        var contentTop = rect.Y + CardInset;
+        var contentBottom = rect.Bottom - CardInset;
 
-        const int portraitSize = 64;
-        var portraitRect = new Rectangle(rect.X + (rect.Width - portraitSize) / 2, rect.Y + 34, portraitSize, portraitSize);
+        // Header band — name vertically centered
+        var headerY = contentTop;
+        DrawBandInset(b, rect, headerY, CardHeaderH, HeaderBandColor);
+
+        var nameSize = Game1.smallFont.MeasureString(preset.Npc);
+        var nameY = headerY + (CardHeaderH - nameSize.Y) / 2f;
+        Utility.drawTextWithShadow(b, preset.Npc, Game1.smallFont,
+            new Vector2(rect.X + (rect.Width - nameSize.X) / 2f, nameY), Color.Black);
+
+        DrawDivider(b, headerY + CardHeaderH, innerX, innerW);
+
+        // Portrait band
+        const int portraitSize = 72;
+        var portraitY = headerY + CardHeaderH + (CardPortraitH - portraitSize) / 2;
+        var portraitRect = new Rectangle(rect.X + (rect.Width - portraitSize) / 2, portraitY, portraitSize, portraitSize);
         PortraitDraw.Draw(b, portraitRect, preset.Npc, _portraits.GetValueOrDefault(preset.Npc));
+
+        // Preview band
+        var previewY = headerY + CardHeaderH + CardPortraitH;
+        DrawDivider(b, previewY, innerX, innerW);
 
         var preview = !string.IsNullOrWhiteSpace(preset.Entry.SubmissionCredit)
             ? preset.Entry.SubmissionCredit
@@ -545,11 +611,12 @@ public sealed class GalleryPane
                 : "");
         if (!string.IsNullOrWhiteSpace(preview))
         {
-            var wrapped = Game1.parseText(preview, Game1.smallFont, rect.Width - 20);
+            var wrapWidth = innerW - 8;
+            var wrapped = Game1.parseText(preview, Game1.tinyFont, wrapWidth);
             var lines = wrapped.Split('\n');
             if (lines.Length > 2)
                 wrapped = string.Join("\n", lines.Take(2)).TrimEnd() + "…";
-            b.DrawString(Game1.smallFont, wrapped, new Vector2(rect.X + 10, rect.Y + 108), Color.Black * 0.7f);
+            b.DrawString(Game1.tinyFont, wrapped, new Vector2(innerX + 4, previewY + 5), PreviewTextColor);
         }
 
         if (preset.Entry.HasCharacterDataOverride)
@@ -558,17 +625,20 @@ public sealed class GalleryPane
 
     private async void UploadLocal(string npc, NpcOverrideEntry entry)
     {
-        Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.upload.progress"), 3));
+        EditorNotify.Info(_i18n.Get("gallery.upload.progress"));
         try
         {
             var author = Game1.player?.Name ?? "Anonymous";
             var ok = await _service.UploadPresetAsync(npc, entry, author);
-            Game1.addHUDMessage(new HUDMessage(_i18n.Get(ok ? "gallery.upload.success" : "gallery.upload.failed"), ok ? 4 : 3));
+            if (ok)
+                EditorNotify.Success(_i18n.Get("gallery.upload.success"));
+            else
+                EditorNotify.Error(_i18n.Get("gallery.upload.failed"));
         }
         catch (Exception ex)
         {
             _monitor.Log($"Local preset upload failed: {ex.Message}", LogLevel.Warn);
-            Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.upload.failed"), 3));
+            EditorNotify.Error(_i18n.Get("gallery.upload.failed"));
         }
     }
 
@@ -698,7 +768,7 @@ public sealed class GalleryPane
         var data = await _service.DownloadPresetAsync(preset.Id);
         if (data == null)
         {
-            Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.upload.failed"), 3));
+            EditorNotify.Error(_i18n.Get("gallery.upload.failed"));
             return;
         }
 
@@ -712,7 +782,7 @@ public sealed class GalleryPane
                 {
                     _presetStore?.Save(npc, entry);
                     _ = _service.ReportDownloadAsync(preset.Id);
-                    Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.preset.saved", new { npcName = npc }), 3));
+                    EditorNotify.Success(_i18n.Get("gallery.preset.saved", new { npcName = npc }));
                     Game1.playSound("coin");
                     _preview = null;
                 })),
@@ -723,7 +793,7 @@ public sealed class GalleryPane
                     _presetStore?.Save(npc, entry);
                     _ = _service.ReportDownloadAsync(preset.Id);
                     ApplyEntry(npc, entry);
-                    Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.import.success", new { npcName = npc }), 3));
+                    EditorNotify.Success(_i18n.Get("gallery.import.success", new { npcName = npc }));
                     Game1.playSound("coin");
                     _preview = null;
                 })),
@@ -742,7 +812,10 @@ public sealed class GalleryPane
     private async Task DeleteServerPreset(string id)
     {
         var deleted = await _service.DeletePresetAsync(id);
-        Game1.addHUDMessage(new HUDMessage(_i18n.Get(deleted ? "gallery.button.delete" : "gallery.upload.failed"), deleted ? 4 : 3));
+        if (deleted)
+            EditorNotify.Success(_i18n.Get("gallery.preset.deleted"));
+        else
+            EditorNotify.Error(_i18n.Get("gallery.upload.failed"));
         _preview = null;
         if (deleted)
         {
@@ -799,7 +872,7 @@ public sealed class GalleryPane
                 GuardCharacterData(entry, () =>
                 {
                     ApplyEntry(npc, entry);
-                    Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.import.success", new { npcName = npc }), 3));
+                    EditorNotify.Success(_i18n.Get("gallery.import.success", new { npcName = npc }));
                     Game1.playSound("coin");
                     _preview = null;
                 })),
@@ -951,7 +1024,25 @@ public sealed class GalleryPreviewModal
     private Rectangle _textArea;
     private int _scrollY;
     private int _maxScroll;
-    private int _armed = -1; // index of a Confirm button awaiting its second click
+    private int _armed = -1;
+
+    private static readonly Color HeaderBandColor = new(242, 214, 162);   // --parch
+    private static readonly Color FieldBgColor = new(255, 247, 228);      // --parch-hi
+    private static readonly Color FieldBorderColor = new(169, 105, 47);    // --slot-edge
+    private static readonly Color FieldLabelColor = new(185, 116, 31);    // --label (orange/gold)
+    private static readonly Color FieldTextColor = new(67, 41, 15);        // --ink
+    private static readonly Color CdKeyColor = new(138, 106, 58);          // --ink-soft
+    private static readonly Color NameColor = new(170, 6, 6);              // red (#aa0606)
+    private static readonly Color SubtitleColor = new(138, 106, 58);       // --ink-soft
+    private static readonly Color HeaderDividerColor = new(122, 74, 36);   // --wood
+    private static readonly Color FooterDividerColor = new(169, 105, 47);  // --slot-edge
+    private static readonly Color Border = new(122, 74, 36);               // --wood
+
+    private const int HeaderH = 150;
+    private const int FooterH = 76;
+    private const int FramePad = 16;
+    private const int FieldPad = 14;
+    private const int FieldGap = 8;
 
     public GalleryPreviewModal(
         string npcName,
@@ -975,27 +1066,47 @@ public sealed class GalleryPreviewModal
     {
         var viewport = Game1.uiViewport;
         _modal = new Rectangle(
-            (viewport.Width - Math.Min(744, viewport.Width - 60)) / 2,
-            (viewport.Height - Math.Min(604, viewport.Height - 60)) / 2,
-            Math.Min(744, viewport.Width - 60),
-            Math.Min(604, viewport.Height - 60));
+            (viewport.Width - Math.Min(820, viewport.Width - 60)) / 2,
+            (viewport.Height - Math.Min(640, viewport.Height - 60)) / 2,
+            Math.Min(820, viewport.Width - 60),
+            Math.Min(640, viewport.Height - 60));
 
         b.Draw(Game1.fadeToBlackRect, new Rectangle(0, 0, viewport.Width, viewport.Height), Color.Black * 0.62f);
         EditorTheme.DrawFrame(b, _modal, Color.White);
 
-        const int portraitSize = 120;
-        var portraitRect = new Rectangle(_modal.X + 42, _modal.Y + 38, portraitSize, portraitSize);
-        PortraitDraw.Draw(b, portraitRect, _npcName, _portraits.GetValueOrDefault(_npcName));
-        PersonalityEditorMenu.DrawBorder(b, portraitRect, new Color(125, 60, 40), 4);
+        DrawHeader(b);
 
-        Utility.drawTextWithShadow(b, _npcName, Game1.dialogueFont,
-            new Vector2(portraitRect.Right + 20, _modal.Y + 42), Color.Black);
-        if (!string.IsNullOrEmpty(_subtitle))
-            b.DrawString(Game1.smallFont, _subtitle, new Vector2(portraitRect.Right + 20, _modal.Y + 76), Color.Gray);
-
-        _textArea = new Rectangle(_modal.X + 42, _modal.Y + 178, _modal.Width - 84, _modal.Height - 252);
+        _textArea = new Rectangle(
+            _modal.X + FramePad * 2,
+            _modal.Y + HeaderH + 6,
+            _modal.Width - FramePad * 4,
+            _modal.Height - HeaderH - FooterH - 12);
         DrawFields(b);
         DrawFooter(b);
+    }
+
+    private void DrawHeader(SpriteBatch b)
+    {
+        // Header area (parchment background, no separate band — just the modal background showing through)
+        const int portraitSize = 96;
+        var portraitX = _modal.X + FramePad + 4;
+        var portraitY = _modal.Y + FramePad + 8;
+        var portraitRect = new Rectangle(portraitX, portraitY, portraitSize, portraitSize);
+        PortraitDraw.Draw(b, portraitRect, _npcName, _portraits.GetValueOrDefault(_npcName));
+        PersonalityEditorMenu.DrawBorder(b, portraitRect, Border, 3);
+
+        // Name in red (like web h2), subtitle in ink-soft
+        Utility.drawTextWithShadow(b, _npcName, Game1.dialogueFont,
+            new Vector2(portraitRect.Right + 16, portraitY - 2), NameColor);
+        if (!string.IsNullOrEmpty(_subtitle))
+            b.DrawString(Game1.smallFont, _subtitle,
+                new Vector2(portraitRect.Right + 16, portraitY + 30), SubtitleColor);
+
+        // 3px solid wood divider between header and body
+        var divY = _modal.Y + HeaderH;
+        b.Draw(Game1.staminaRect,
+            new Rectangle(_modal.X + FramePad, divY, _modal.Width - FramePad * 2, 3),
+            HeaderDividerColor);
     }
 
     private void DrawFields(SpriteBatch b)
@@ -1010,7 +1121,6 @@ public sealed class GalleryPreviewModal
         var y = _textArea.Y - _scrollY;
         if (_entry.IsFarmer)
         {
-            // Farmer preset: use the backstory question labels instead of NPC ones.
             y = DrawField(b, _i18n.Get("farmer.field.1"), _entry.CanonicalPersonality, y);
             y = DrawField(b, _i18n.Get("farmer.field.2"), _entry.Lore, y);
             y = DrawField(b, _i18n.Get("farmer.field.3"), _entry.SocialTags, y);
@@ -1041,43 +1151,76 @@ public sealed class GalleryPreviewModal
     {
         if (string.IsNullOrWhiteSpace(text))
             return y;
-        Utility.drawTextWithShadow(b, label, Game1.smallFont, new Vector2(_textArea.X, y), Color.Black);
-        y += 32;
-        var wrapped = Game1.parseText(text, Game1.smallFont, _textArea.Width - 12);
-        b.DrawString(Game1.smallFont, wrapped, new Vector2(_textArea.X + 4, y), new Color(80, 75, 80));
-        y += wrapped.Split('\n').Length * (int)Game1.smallFont.MeasureString("A").Y + 18;
-        return y;
+
+        var wrapWidth = _textArea.Width - FieldPad * 2;
+        var wrapped = Game1.parseText(text, Game1.smallFont, wrapWidth);
+        var lineH = (int)Game1.smallFont.MeasureString("A").Y;
+        var textLines = wrapped.Split('\n').Length;
+        var labelH = (int)Game1.smallFont.MeasureString("A").Y + 4;
+        var blockH = labelH + textLines * lineH + FieldPad;
+
+        // Field card: parchment-hi background with slot-edge border (like web .field)
+        var fieldRect = new Rectangle(_textArea.X, y, _textArea.Width, blockH);
+        b.Draw(Game1.staminaRect, fieldRect, FieldBgColor);
+        PersonalityEditorMenu.DrawBorder(b, fieldRect, FieldBorderColor, 2);
+
+        // Uppercase orange/gold label
+        var labelText = label.ToUpperInvariant();
+        Utility.drawTextWithShadow(b, labelText, Game1.smallFont,
+            new Vector2(fieldRect.X + FieldPad, y + 6), FieldLabelColor);
+
+        // Body text in ink
+        b.DrawString(Game1.smallFont, wrapped,
+            new Vector2(fieldRect.X + FieldPad, y + labelH + 2), FieldTextColor);
+
+        return y + blockH + FieldGap;
     }
 
-    // Character Data rendered as readable "Label: value" rows (never raw JSON).
     private int DrawCharacterData(SpriteBatch b, CharacterDataOverride? cd, int y)
     {
         if (cd == null || !cd.HasAnyField)
             return y;
 
-        Utility.drawTextWithShadow(b, _i18n.Get("field.character_data").ToString(), Game1.smallFont,
-            new Vector2(_textArea.X, y), Color.Black);
-        y += 32;
+        var rows = new List<(string LabelKey, string? Value)>();
+        rows.Add(("field.display_name", cd.DisplayName));
+        rows.Add(("field.gender", EnumLabel("field.gender", cd.Gender)));
+        rows.Add(("field.age", EnumLabel("field.age", cd.Age)));
+        rows.Add(("field.manner", EnumLabel("field.manner", cd.Manner)));
+        rows.Add(("field.social_anxiety", EnumLabel("field.social_anxiety", cd.SocialAnxiety)));
+        rows.Add(("field.optimism", EnumLabel("field.optimism", cd.Optimism)));
+        rows.Add(("field.can_socialize", BoolLabel(cd.CanSocialize)));
+        rows.Add(("field.can_be_romanced", BoolLabel(cd.CanBeRomanced)));
+        rows.Add(("field.birthday", Birthday(cd)));
 
-        y = DrawRow(b, "field.display_name", cd.DisplayName, y);
-        y = DrawRow(b, "field.gender", EnumLabel("field.gender", cd.Gender), y);
-        y = DrawRow(b, "field.age", EnumLabel("field.age", cd.Age), y);
-        y = DrawRow(b, "field.manner", EnumLabel("field.manner", cd.Manner), y);
-        y = DrawRow(b, "field.social_anxiety", EnumLabel("field.social_anxiety", cd.SocialAnxiety), y);
-        y = DrawRow(b, "field.optimism", EnumLabel("field.optimism", cd.Optimism), y);
-        y = DrawRow(b, "field.can_socialize", BoolLabel(cd.CanSocialize), y);
-        y = DrawRow(b, "field.can_be_romanced", BoolLabel(cd.CanBeRomanced), y);
-        y = DrawRow(b, "field.birthday", Birthday(cd), y);
-        return y + 12;
-    }
+        var visibleRows = rows.Where(r => !string.IsNullOrWhiteSpace(r.Value)).ToList();
+        var rowH = (int)Game1.smallFont.MeasureString("A").Y + 4;
+        var labelH = (int)Game1.smallFont.MeasureString("A").Y + 4;
+        var panelH = labelH + visibleRows.Count * rowH + FieldPad;
 
-    private int DrawRow(SpriteBatch b, string labelKey, string? value, int y)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return y;
-        var text = $"{_i18n.Get(labelKey)}: {value}";
-        b.DrawString(Game1.smallFont, text, new Vector2(_textArea.X + 4, y), new Color(80, 75, 80));
-        return y + (int)Game1.smallFont.MeasureString("A").Y + 6;
+        // CD card: same style as regular field cards (parch-hi + slot-edge border)
+        var panelRect = new Rectangle(_textArea.X, y, _textArea.Width, panelH);
+        b.Draw(Game1.staminaRect, panelRect, FieldBgColor);
+        PersonalityEditorMenu.DrawBorder(b, panelRect, FieldBorderColor, 2);
+
+        // Uppercase orange/gold section label
+        var labelText = _i18n.Get("field.character_data").ToString().ToUpperInvariant();
+        Utility.drawTextWithShadow(b, labelText, Game1.smallFont,
+            new Vector2(panelRect.X + FieldPad, y + 6), FieldLabelColor);
+
+        // Key:value rows (key in CdKeyColor, value in FieldTextColor)
+        var rowY = y + labelH + 2;
+        foreach (var (labelKey, value) in visibleRows)
+        {
+            var keyText = $"{_i18n.Get(labelKey)}:";
+            b.DrawString(Game1.smallFont, keyText,
+                new Vector2(panelRect.X + FieldPad, rowY), CdKeyColor);
+            var keyW = (int)Game1.smallFont.MeasureString(keyText).X;
+            b.DrawString(Game1.smallFont, value,
+                new Vector2(panelRect.X + FieldPad + keyW + 8, rowY), FieldTextColor);
+            rowY += rowH;
+        }
+
+        return y + panelH + FieldGap;
     }
 
     private string? EnumLabel(string prefix, int? value)
@@ -1102,13 +1245,39 @@ public sealed class GalleryPreviewModal
         var count = _actions.Count;
         if (count == 0)
             return;
+
+        // Divider line above footer (like web .modal-actions border-top)
+        var divY = _modal.Bottom - FooterH + 4;
+        b.Draw(Game1.staminaRect,
+            new Rectangle(_modal.X + FramePad, divY, _modal.Width - FramePad * 2, 2),
+            FooterDividerColor);
+
         const int pad = 16;
         const int gap = 10;
-        var y = _modal.Bottom - 76;
-        var btnW = (_modal.Width - pad * 2 - gap * (count - 1)) / count;
+        const int btnH = 52;
+        var y = _modal.Bottom - btnH - 12;
+        // Right-align buttons (web modal-actions justify-end)
+        var maxBtnW = 220;
+        var totalW = count * maxBtnW + (count - 1) * gap;
+        var startX = _modal.Right - pad - totalW;
+        if (startX < _modal.X + pad)
+        {
+            // Fallback: even distribution if buttons don't fit right-aligned
+            var btnW = (_modal.Width - pad * 2 - gap * (count - 1)) / count;
+            for (var i = 0; i < count; i++)
+            {
+                var rect = new Rectangle(_modal.X + pad + i * (btnW + gap), y, btnW, btnH);
+                _actionRects.Add(rect);
+                var armed = i == _armed;
+                var label = armed ? _actions[i].ConfirmLabel : _actions[i].Label;
+                var color = armed ? new Color(225, 125, 85) : _actions[i].Color;
+                EditorTheme.DrawButton(b, rect, label, color, Color.Black);
+            }
+            return;
+        }
         for (var i = 0; i < count; i++)
         {
-            var rect = new Rectangle(_modal.X + pad + i * (btnW + gap), y, btnW, 58);
+            var rect = new Rectangle(startX + i * (maxBtnW + gap), y, maxBtnW, btnH);
             _actionRects.Add(rect);
             var armed = i == _armed;
             var label = armed ? _actions[i].ConfirmLabel : _actions[i].Label;
