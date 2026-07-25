@@ -109,6 +109,8 @@ public sealed class CharacterDataService
         CanBeRomanced = d.CanBeRomanced
     };
 
+    private static IMonitor? _staticMonitor;
+
     private static void CaptureOriginals(IDictionary<string, CharacterData> data)
     {
         foreach (var (npc, cd) in data)
@@ -119,12 +121,45 @@ public sealed class CharacterDataService
     private readonly IMonitor _monitor;
     private readonly Func<Dictionary<string, NpcOverrideEntry>> _getOverrides;
     private readonly Action? _onRestored;
+    private Action<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>? _onDiagnostics;
 
     public CharacterDataService(IMonitor monitor, Func<Dictionary<string, NpcOverrideEntry>> getOverrides, Action? onRestored = null)
     {
         _monitor = monitor;
+        _staticMonitor = monitor;
         _getOverrides = getOverrides;
         _onRestored = onRestored;
+    }
+
+    public void OnDiagnosticsReady(Action<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> callback)
+    {
+        _onDiagnostics = callback;
+    }
+
+    private void PushDiagnostics()
+    {
+        if (_onDiagnostics == null)
+            return;
+
+        var detectedCopy = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (npc, fields) in DetectedExternal)
+            detectedCopy[npc] = new Dictionary<string, string>(fields);
+
+        var originalsCopy = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (npc, fields) in Originals)
+        {
+            originalsCopy[npc] = new Dictionary<string, string>
+            {
+                ["DisplayName"] = fields.DisplayName,
+                ["Gender"] = fields.Gender.ToString(),
+                ["Age"] = fields.Age.ToString(),
+                ["Manner"] = fields.Manner.ToString(),
+                ["SocialAnxiety"] = fields.SocialAnxiety.ToString(),
+                ["Optimism"] = fields.Optimism.ToString(),
+            };
+        }
+
+        _onDiagnostics(detectedCopy, originalsCopy);
     }
 
     public void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
@@ -132,8 +167,11 @@ public sealed class CharacterDataService
         if (!e.NameWithoutLocale.IsEquivalentTo(CharactersAssetName))
             return;
 
+        // Early: capture vanilla data BEFORE any mod applies overrides (including our own Late pass).
+        // Registered as a separate handler so it fires on the very first asset load.
         e.Edit(asset => CaptureOriginals(asset.AsDictionary<string, CharacterData>().Data), AssetEditPriority.Early);
 
+        // Late: apply user overrides.
         e.Edit(asset =>
         {
             var data = asset.AsDictionary<string, CharacterData>().Data;
@@ -221,6 +259,8 @@ public sealed class CharacterDataService
 
         if (anyRestored && DetectedExternal.Count > 0)
             _onRestored?.Invoke();
+
+        PushDiagnostics();
     }
 
     private static void RestoreScopedFields(CharacterData cd, ScopedFields o)

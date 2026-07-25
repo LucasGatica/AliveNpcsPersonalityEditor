@@ -126,5 +126,6 @@
   "npc.disable.tooltip": "Check to disable this NPC from all AliveNpcs interactions. Base-game dialogue will still work.",
   "ui.no": "No",
   "ui.yes": "Yes",
-  "cd.restored_notification": "Some NPC Character Data was changed by other mods. Original values have been restored. Enable Character Data in the Personality Manager to use the modded values instead."
+  "cd.restored_notification": "Some NPC Character Data was changed by other mods. Original values have been restored. Enable Character Data in the Personality Manager to use the modded values instead.",
+  "patch.portraitOriginalName": "Originally {{name}}"
 }

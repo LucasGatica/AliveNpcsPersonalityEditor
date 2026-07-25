@@ -260,11 +260,11 @@ public sealed class FarmerFormPanel
             };
             if (!entry.HasAnyField)
             {
-                Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.preset.none"), 3));
+                EditorNotify.Info(_i18n.Get("gallery.preset.none"));
                 return;
             }
             _presetStore.Save("Farmer", entry);
-            Game1.addHUDMessage(new HUDMessage(_i18n.Get("gallery.preset.saved", new { npcName = "Farmer" }), 3));
+            EditorNotify.Success(_i18n.Get("gallery.preset.saved", new { npcName = "Farmer" }));
             Game1.playSound("coin");
         }
         catch (Exception ex)

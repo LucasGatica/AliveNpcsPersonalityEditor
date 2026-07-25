@@ -53,4 +53,20 @@ public interface IAliveNpcsApi
 
     /// <summary>Enable/disable injecting structured CharacterData into the AI prompt (experimental, off by default).</summary>
     void SetCharacterDataPromptEnabled(bool enabled);
+
+    /// <summary>
+    /// When true, the editor overrides the in-game character sheet menu (F7). AliveNpcs should
+    /// NOT open its own CharacterSheetMenu, letting the editor handle the keybind instead.
+    /// </summary>
+    void SetCharacterSheetOverrideEnabled(bool enabled);
+
+    /// <summary>
+    /// Push CharacterData diagnostics detected by the Personality Manager so the prompt builder
+    /// can include other mods' changes in the identity/pronoun block.
+    /// detected = npcName → { field: value } for external changes.
+    /// originals = npcName → { field: value } for the vanilla baseline captured at Early priority.
+    /// </summary>
+    void SetCharacterDataDiagnostics(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? detected,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? originals);
 }

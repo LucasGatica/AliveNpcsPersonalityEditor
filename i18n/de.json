@@ -126,5 +126,6 @@
   "npc.disable.tooltip": "Aktivieren, um diesen NPC von allen AliveNpcs-Interaktionen auszuschließen. Die Dialoge des Grundspiels funktionieren weiterhin.",
   "ui.no": "Nein",
   "ui.yes": "Ja",
-  "cd.restored_notification": "Einige NPC-Charakterdaten wurden von anderen Mods geändert. Die Originalwerte wurden wiederhergestellt. Aktiviere Character Data im Persönlichkeits-Manager, um die geänderten Werte zu verwenden."
+  "cd.restored_notification": "Einige NPC-Charakterdaten wurden von anderen Mods geändert. Die Originalwerte wurden wiederhergestellt. Aktiviere Character Data im Persönlichkeits-Manager, um die geänderten Werte zu verwenden.",
+  "patch.portraitOriginalName": "Ursprünglich {{name}}"
 }

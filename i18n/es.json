@@ -126,5 +126,6 @@
   "npc.disable.tooltip": "Márcalo para desactivar este NPC de todas las interacciones de AliveNpcs. Los diálogos base del juego seguirán funcionando.",
   "ui.no": "No",
   "ui.yes": "Sí",
-  "cd.restored_notification": "Algunos datos de personajes (Character Data) fueron modificados por otros mods. Se han restaurado los valores originales. Activa Character Data en el Gestor de Personalidades para usar los valores modificados."
+  "cd.restored_notification": "Algunos datos de personajes (Character Data) fueron modificados por otros mods. Se han restaurado los valores originales. Activa Character Data en el Gestor de Personalidades para usar los valores modificados.",
+  "patch.portraitOriginalName": "Originalmente {{name}}"
 }

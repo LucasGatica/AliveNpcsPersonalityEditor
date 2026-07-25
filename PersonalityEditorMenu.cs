@@ -57,10 +57,19 @@ public sealed class PersonalityEditorMenu : IClickableMenu
     private const int HeaderTitleH = 60;   // in-window title band (per-tab title)
     private const int TabStripH = 48;      // raised tabs sitting on the window's top edge
     private const int CategoryBarH = 44;   // NPC category button row (NPCs tab only)
-    private const int CardSize = 194;
+    private const int CardSize = 210;
     private const int CardRowGap = 32;
     private const int MaxCardGap = 40;   // cap the horizontal gap so wide grids don't spread cards apart
     private const int PortraitSourceSize = 64;
+
+    // Card internal band heights — banded layout matching Gallery cards.
+    private const int NpcCardHeaderH = 28;
+    private const int NpcCardPortraitH = 182; // fills the rest of the 210px card
+    private const int NpcCardInset = EditorTheme.FramePad; // 16px
+
+    // Band/divider colors matching GalleryPane colors.
+    private static readonly Color HeaderBandColor = new(210, 180, 138);
+    private static readonly Color DividerColor = new(0, 0, 0, 38);
 
     private static readonly Color TabActive = new(235, 155, 45);
     private static readonly Color TabInactive = new(255, 240, 215);
@@ -227,7 +236,7 @@ public sealed class PersonalityEditorMenu : IClickableMenu
     private void RecalculateLayout()
     {
         var viewport = Game1.uiViewport;
-        width = Math.Min(1104, viewport.Width - 24);
+        width = Math.Min(1200, viewport.Width - 24);
         // Slightly shorter than before, and leave room above for the raised tab strip.
         height = Math.Min(880, viewport.Height - 24 - TabStripH);
         xPositionOnScreen = (viewport.Width - width) / 2;
@@ -444,27 +453,48 @@ public sealed class PersonalityEditorMenu : IClickableMenu
     {
         EditorTheme.DrawFrame(b, rect, CardBackground);
 
+        var innerX = rect.X + NpcCardInset;
+        var innerW = rect.Width - NpcCardInset * 2;
+        var contentTop = rect.Y + NpcCardInset;
+
+        // Header band — checkbox + name
+        DrawNpcBandInset(b, rect, contentTop, NpcCardHeaderH, HeaderBandColor);
+        DrawNpcDivider(b, contentTop + NpcCardHeaderH, innerX, innerW);
+
         DrawNpcDisabledCheckbox(b, npcName, rect);
 
         var displayName = _displayNames.GetValueOrDefault(npcName, npcName);
         var nameColor = _store.HasOverride(npcName) ? new Color(55, 120, 45) : Color.Black;
         var nameSize = Game1.smallFont.MeasureString(displayName);
         var checkbox = GetNpcDisabledCheckboxRect(rect);
-        var nameArea = new Rectangle(checkbox.Right + 4, rect.Y + 6, rect.Right - checkbox.Right - 12, 28);
+        var nameArea = new Rectangle(checkbox.Right + 4, contentTop, rect.Right - checkbox.Right - NpcCardInset - 4, NpcCardHeaderH);
         var nameScale = nameSize.X > nameArea.Width ? Math.Max(0.65f, nameArea.Width / nameSize.X) : 1f;
+        var nameY = contentTop + (NpcCardHeaderH - nameSize.Y * nameScale) / 2f;
         Utility.drawTextWithShadow(b, displayName, Game1.smallFont,
-            new Vector2(nameArea.X + (nameArea.Width - nameSize.X * nameScale) / 2f, rect.Y + 8), nameColor, nameScale);
+            new Vector2(nameArea.X + (nameArea.Width - nameSize.X * nameScale) / 2f, nameY), nameColor, nameScale);
 
-        var portraitSize = Math.Min(148, rect.Width - 24);
-        var portraitRect = new Rectangle(rect.X + (rect.Width - portraitSize) / 2, rect.Bottom - portraitSize, portraitSize, portraitSize);
+        // Portrait band — fills the rest
+        var portraitY = contentTop + NpcCardHeaderH;
+        var portraitAvailable = rect.Bottom - NpcCardInset - portraitY;
+        var portraitSize = Math.Min(portraitAvailable, innerW);
+        var portraitRect = new Rectangle(rect.X + (rect.Width - portraitSize) / 2, portraitY + (portraitAvailable - portraitSize) / 2, portraitSize, portraitSize);
         PortraitDraw.Draw(b, portraitRect, npcName, _portraits.GetValueOrDefault(npcName));
 
         if (_store.Get(npcName)?.HasCharacterDataOverride == true)
             EditorTheme.DrawCharacterDataBadge(b, rect, _i18n.Get("indicator.character_data").ToString());
     }
 
+    private static void DrawNpcBandInset(SpriteBatch b, Rectangle card, int y, int height, Color color)
+        => b.Draw(Game1.staminaRect, new Rectangle(card.X + NpcCardInset, y, card.Width - NpcCardInset * 2, height), color);
+
+    private static void DrawNpcDivider(SpriteBatch b, int y, int x, int width)
+        => b.Draw(Game1.staminaRect, new Rectangle(x, y, width, 1), DividerColor);
+
     private static Rectangle GetNpcDisabledCheckboxRect(Rectangle cardRect)
-        => new(cardRect.X + 8, cardRect.Y + 8, 22, 22);
+    {
+        var y = cardRect.Y + NpcCardInset + (NpcCardHeaderH - 22) / 2;
+        return new Rectangle(cardRect.X + NpcCardInset + 2, y, 22, 22);
+    }
 
     private void DrawNpcDisabledCheckbox(SpriteBatch b, string npcName, Rectangle cardRect)
     {

@@ -59,23 +59,24 @@ internal static class EditorTheme
     private static readonly Color CdBadgeText = new(74, 45, 20);   // dark brown, high contrast on amber
 
     /// <summary>
-    /// Mark a card whose preset/override writes the game's Data/Characters: an amber
-    /// accent border plus a small labelled badge in the top-right corner.
+    /// Mark a card whose preset/override writes the game's Data/Characters: a small
+    /// amber badge in the top-right corner, aligned with the name band.
     /// </summary>
     public static void DrawCharacterDataBadge(SpriteBatch b, Rectangle card, string label, int thickness = 3)
     {
-        // Amber accent border (distinct from the neutral card frame).
-        b.Draw(Game1.fadeToBlackRect, new Rectangle(card.X, card.Y, card.Width, thickness), CdAccent);
-        b.Draw(Game1.fadeToBlackRect, new Rectangle(card.X, card.Bottom - thickness, card.Width, thickness), CdAccent);
-        b.Draw(Game1.fadeToBlackRect, new Rectangle(card.X, card.Y, thickness, card.Height), CdAccent);
-        b.Draw(Game1.fadeToBlackRect, new Rectangle(card.Right - thickness, card.Y, thickness, card.Height), CdAccent);
-
-        // Corner badge.
-        var size = Game1.smallFont.MeasureString(label);
-        const int padX = 8, padY = 3;
-        var badge = new Rectangle(card.Right - (int)size.X - padX * 2 - 6, card.Y + 6, (int)size.X + padX * 2, (int)size.Y + padY * 2);
+        var size = Game1.tinyFont.MeasureString(label);
+        const float scale = 0.75f;
+        var scaledW = size.X * scale;
+        var scaledH = size.Y * scale;
+        const int padX = 3, padY = 1;
+        var badge = new Rectangle(
+            card.Right - FramePad - (int)scaledW - padX * 2 - 2,
+            card.Y + FramePad + 4,
+            (int)scaledW + padX * 2,
+            (int)scaledH + padY * 2);
         b.Draw(Game1.staminaRect, badge, CdAccent);
-        b.DrawString(Game1.smallFont, label, new Vector2(badge.X + padX, badge.Y + padY), CdBadgeText);
+        Utility.drawTextWithShadow(b, label, Game1.tinyFont,
+            new Vector2(badge.X + padX, badge.Y + padY), CdBadgeText, scale);
     }
 
     /// <summary>Draw a themed scrollbar (game runner + thumb sprites) beside an area.</summary>

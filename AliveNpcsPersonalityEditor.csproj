@@ -8,6 +8,7 @@
     <AssemblyVersion>2.1.1.0</AssemblyVersion>
     <FileVersion>2.1.1.0</FileVersion>
     <ModFolderName>AliveNpcsPersonalityEditor</ModFolderName>
+    <EnableHarmony>true</EnableHarmony>
   </PropertyGroup>
 
   <Import Project="GamePath.targets" Condition="Exists('GamePath.targets')" />
