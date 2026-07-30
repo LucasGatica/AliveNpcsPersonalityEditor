@@ -405,6 +405,12 @@ public sealed class GalleryPane
             return;
         }
 
+        // Recompute here every frame: _maxScroll is shared with Local mode, which
+        // overwrites it for its own (usually shorter) list. Without this, switching
+        // Local -> Discover would redraw the cached discover cards with a stale
+        // _maxScroll of 0, killing the scrollbar. See DrawLocalCards.
+        UpdateMaxScroll();
+
         var previousScissor = b.GraphicsDevice.ScissorRectangle;
         var previousRasterizer = b.GraphicsDevice.RasterizerState;
         b.End();
@@ -644,14 +650,17 @@ public sealed class GalleryPane
 
     private void SwitchMode(int mode)
     {
-        if (_mode == mode)
-            return;
+        // Always refresh, even when the tab is already active, so every click
+        // re-pulls the latest data (Discover -> Discover re-queries the server,
+        // Local -> Local re-reads saved presets from disk).
         Unsubscribe();
         _mode = mode;
         _search.Text = "";
         _scrollY = 0;
-        if (mode == 1)
-            ReloadLocal();
+        if (mode == 0)
+            _ = SearchAsync();   // re-query the server for fresh gallery results
+        else
+            ReloadLocal();       // re-read local presets from disk
         Game1.playSound("smallSelect");
     }
 
