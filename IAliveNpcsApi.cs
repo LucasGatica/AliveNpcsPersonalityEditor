@@ -69,4 +69,10 @@ public interface IAliveNpcsApi
     void SetCharacterDataDiagnostics(
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? detected,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? originals);
+
+    /// <summary>
+    /// Get the absolute path of the AliveNpcs mod directory. Lets the editor resolve
+    /// save-data paths without guessing folder names.
+    /// </summary>
+    string? GetModDirectoryPath();
 }

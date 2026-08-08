@@ -134,6 +134,12 @@ public sealed class ModEntry : Mod
     {
         try
         {
+            // Primary: ask the AliveNpcs API for its own mod directory — works regardless of folder name.
+            var apiDir = _api?.GetModDirectoryPath();
+            if (!string.IsNullOrWhiteSpace(apiDir) && System.IO.Directory.Exists(apiDir))
+                return apiDir;
+
+            // Fallback: scan sibling mod folders for known AliveNpcs folder names.
             var editorDir = Helper.DirectoryPath;
             var modsRoot = System.IO.Path.GetDirectoryName(editorDir);
             if (!string.IsNullOrEmpty(modsRoot))
@@ -146,6 +152,8 @@ public sealed class ModEntry : Mod
                         return full;
                 }
             }
+
+            // Last resort: if the mod is loaded but we can't resolve its directory, use the editor's own dir.
             var info = Helper.ModRegistry.Get("Lucas.AliveNpcs");
             return info is null ? null : editorDir;
         }
