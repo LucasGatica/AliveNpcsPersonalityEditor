@@ -1,4 +1,7 @@
 {
+  "ui.keyboardShift": "Shift",
+  "ui.keyboardSpace": "Space",
+  "ui.keyboardDone": "Done",
   "editor.title": "AliveNpcs - Personality Manager",
   "editor.description": "Edit NPC personalities, lore, and character data used by AliveNpcs AI dialogue. Changes take effect on the next conversation.",
   "editor.select_prompt": "Click on an NPC to edit their personality and character data.",

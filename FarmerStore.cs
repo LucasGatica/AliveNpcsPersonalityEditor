@@ -58,8 +58,25 @@ public sealed class FarmerStore
         }
     }
 
+    /// <summary>
+    /// Writes the sheet, preserving every field the editor does not own.
+    /// <para>
+    /// This file belongs to AliveNpcs and keeps growing — 1.7.3 added the farmer's birthday. The
+    /// editor edits exactly four values, but it used to serialise a freshly built object straight
+    /// over the file, which erased anything else that was in there. So re-read what is on disk,
+    /// lay the four edited values on top, and write that back.
+    /// </para>
+    /// </summary>
     public void Save(CharacterSheetData sheet)
     {
+        var merged = ReadFromDisk() ?? new CharacterSheetData();
+
+        merged.WhoAmI = sheet.WhoAmI;
+        merged.WhyMovedHere = sheet.WhyMovedHere;
+        merged.ExtraInfo = sheet.ExtraInfo;
+        merged.AtAGlanceDetails = sheet.AtAGlanceDetails;
+        sheet = merged;
+
         sheet.HasBeenFilled = true;
         try
         {
@@ -89,6 +106,22 @@ public sealed class FarmerStore
         catch (Exception ex)
         {
             _monitor.Log($"FarmerStore save failed: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>Reads the current on-disk sheet, or null when there isn't a readable one.</summary>
+    private CharacterSheetData? ReadFromDisk()
+    {
+        try
+        {
+            var path = ResolvePath();
+            return File.Exists(path) ? Deserialize(File.ReadAllText(path)) : null;
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"FarmerStore: could not re-read the sheet before saving ({ex.Message}); " +
+                         "writing only the edited fields.", LogLevel.Warn);
+            return null;
         }
     }
 

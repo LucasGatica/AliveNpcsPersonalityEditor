@@ -1,4 +1,7 @@
 {
+  "ui.keyboardShift": "Maj",
+  "ui.keyboardSpace": "Espace",
+  "ui.keyboardDone": "Terminé",
   "editor.title": "AliveNpcs - Gestionnaire de Personnalité",
   "editor.description": "Modifiez les personnalités, le lore et les données de personnage des PNJ utilisées par les dialogues IA d'AliveNpcs. Les changements prennent effet lors de la prochaine conversation.",
   "editor.select_prompt": "Cliquez sur un PNJ pour modifier sa personnalité et ses données de personnage.",

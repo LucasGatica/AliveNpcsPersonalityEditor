@@ -1,4 +1,7 @@
 {
+  "ui.keyboardShift": "Mayús",
+  "ui.keyboardSpace": "Espacio",
+  "ui.keyboardDone": "Listo",
   "editor.title": "AliveNpcs - Gestor de Personalidades",
   "editor.description": "Edita personalidades, lore y datos de personaje de NPCs para los diálogos de IA de AliveNpcs. Los cambios surten efecto en la próxima conversación.",
   "editor.select_prompt": "Haz clic en un NPC para editar su personalidad y datos de personaje.",

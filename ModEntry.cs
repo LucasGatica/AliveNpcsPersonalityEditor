@@ -18,6 +18,11 @@ public sealed class ModEntry : Mod
     public override void Entry(IModHelper helper)
     {
         _config = helper.ReadConfig<EditorConfig>();
+
+        // The on-screen keyboard is a static-labelled control, so hand it the translation helper
+        // once rather than threading it through every panel that owns a keyboard.
+        VirtualKeyboard.Translations = helper.Translation;
+
         _store = new PersonalityStore(helper.DirectoryPath, Monitor);
         _store.Load();
         _presetStore = new PresetStore(helper.DirectoryPath, Monitor);

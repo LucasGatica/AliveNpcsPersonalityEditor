@@ -1,4 +1,7 @@
 {
+  "ui.keyboardShift": "Maiusc",
+  "ui.keyboardSpace": "Spazio",
+  "ui.keyboardDone": "Fatto",
   "editor.title": "AliveNpcs - Gestore di Personalità",
   "editor.description": "Modifica personalità, lore e dati dei personaggi dei PNG usati dai dialoghi IA di AliveNpcs. Le modifiche avranno effetto nella prossima conversazione.",
   "editor.select_prompt": "Clicca su un PNG per modificare la sua personalità e i dati del personaggio.",

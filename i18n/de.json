@@ -1,4 +1,7 @@
 {
+  "ui.keyboardShift": "Umschalt",
+  "ui.keyboardSpace": "Leer",
+  "ui.keyboardDone": "Fertig",
   "editor.title": "AliveNpcs - Persönlichkeits-Manager",
   "editor.description": "Bearbeite NPC-Persönlichkeiten, Lore und Charakterdaten für die KI-Dialoge von AliveNpcs. Änderungen werden beim nächsten Gespräch wirksam.",
   "editor.select_prompt": "Klicke auf einen NPC, um seine Persönlichkeit und Charakterdaten zu bearbeiten.",

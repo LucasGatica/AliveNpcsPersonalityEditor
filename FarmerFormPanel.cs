@@ -26,6 +26,8 @@ public sealed class FarmerFormPanel
     private readonly System.Action _onSaved;
 
     private readonly MultilineTextBox[] _boxes = new MultilineTextBox[4];
+    private readonly VirtualKeyboard _keyboard = new();
+    private readonly Rectangle[] _keyboardButtons = new Rectangle[4];
     private int _activeField = -1;
 
     private Rectangle _cancelBtn;
@@ -133,6 +135,11 @@ public sealed class FarmerFormPanel
             Utility.drawTextWithShadow(b, labels[i], Game1.smallFont,
                 new Vector2(r.X, r.Y), Color.SaddleBrown);
 
+            // Touch and click arrive the same way, so one always-visible button per field is all
+            // mobile needs - no device detection, no setting.
+            _keyboardButtons[i] = GetKeyboardButtonBounds(r, labels[i]);
+            VirtualKeyboard.DrawLauncherButton(b, _keyboardButtons[i], _keyboard.IsTargeting(_boxes[i]));
+
             var boxRect = new Rectangle(r.X, r.Y + LabelH, r.Width, r.Height - LabelH - FieldSpacing + 4);
             _boxes[i].Bounds = boxRect;
             _boxes[i].Draw(b);
@@ -148,6 +155,21 @@ public sealed class FarmerFormPanel
         DrawButton(b, _cancelBtn, _i18n.Get("button.cancel"), BtnReset);
         DrawButton(b, _saveGalleryBtn, _i18n.Get("button.save_gallery"), BtnGallery);
         DrawButton(b, _saveBtn, _i18n.Get("button.save"), BtnSave);
+
+        // Drawn last so it sits above the form it covers.
+        _keyboard.Draw(b);
+    }
+
+    /// <summary>
+    /// Where a field's keyboard button sits: just after its label. Measured from the label text so
+    /// drawing and hit-testing can't disagree, and so it follows translated label widths.
+    /// </summary>
+    private static Rectangle GetKeyboardButtonBounds(Rectangle fieldRect, string label)
+    {
+        const int height = 32;
+        var labelWidth = (int)Game1.smallFont.MeasureString(label ?? "").X;
+        var labelCentreY = fieldRect.Y + (int)(Game1.smallFont.MeasureString("A").Y / 2);
+        return new Rectangle(fieldRect.X + labelWidth + 12, labelCentreY - height / 2, 40, height);
     }
 
     private static void DrawButton(SpriteBatch b, Rectangle rect, string label, Color bg)
@@ -155,7 +177,31 @@ public sealed class FarmerFormPanel
 
     public void receiveLeftClick(int x, int y)
     {
+        // The keyboard gets first refusal: it covers the form, so anything under it is
+        // unreachable rather than merely hidden.
+        if (_keyboard.ReceiveLeftClick(x, y))
+            return;
+
         var (_, fieldRects, _) = GetLayout();
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (_keyboardButtons[i].Contains(x, y))
+            {
+                var kbRect = new Rectangle(fieldRects[i].X, fieldRects[i].Y + LabelH,
+                    fieldRects[i].Width, fieldRects[i].Height - LabelH - FieldSpacing + 4);
+                _boxes[i].Bounds = kbRect;
+                SetActiveField(i);
+
+                if (_keyboard.IsTargeting(_boxes[i]))
+                    _keyboard.Close();
+                else
+                    _keyboard.Open(_boxes[i]);
+
+                Game1.playSound("bigSelect");
+                return;
+            }
+        }
 
         for (int i = 0; i < 4; i++)
         {
@@ -206,6 +252,7 @@ public sealed class FarmerFormPanel
 
     private void UnsubscribeTextBox()
     {
+        _keyboard.Close();
         _activeField = -1;
         foreach (var box in _boxes)
             box.Selected = false;
@@ -287,6 +334,14 @@ public sealed class FarmerFormPanel
     {
         if (key == Keys.Escape)
         {
+            // Escape dismisses the keyboard first, so it can't close the whole tab out from
+            // under someone who only wanted to put the keyboard away.
+            if (_keyboard.IsOpen)
+            {
+                _keyboard.Close();
+                return;
+            }
+
             UnsubscribeTextBox();
             return;
         }
