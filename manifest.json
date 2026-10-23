@@ -1,7 +1,7 @@
 {
   "Name": "AliveNpcs Personality Manager",
   "Author": "Lucas Gatica",
-  "Version": "2.1.1",
+  "Version": "2.1.2",
   "Description": "In-game editor for farmer and NPC profiles, including appearance, personality, lore, social tags, character data, and community catalog presets.",
   "UniqueID": "Lucas.AliveNpcsPersonalityEditor",
   "EntryDll": "AliveNpcsPersonalityEditor.dll",
@@ -9,7 +9,7 @@
   "Dependencies": [
     {
       "UniqueID": "Lucas.AliveNpcs",
-      "MinimumVersion": "1.4.5",
+      "MinimumVersion": "1.5.3",
       "IsRequired": true
     },
     {

@@ -32,6 +32,14 @@ public sealed class PersonalityEditModal : IClickableMenu
     private MultilineTextBox _socialTagsBox = null!;
     private MultilineTextBox _creditBox = null!;
     private ActiveField _activeField;
+
+    private readonly VirtualKeyboard _keyboard = new();
+
+    /// <summary>
+    /// Launcher button hit-boxes, rebuilt every frame in <see cref="DrawTextField"/>. They move with
+    /// the scroll offset, so they can't be computed once at layout time.
+    /// </summary>
+    private readonly List<(Rectangle Bounds, ActiveField Field, MultilineTextBox Box)> _keyboardButtons = new();
     private string _originalDisplayName = "";
 
     private CharacterDataOverride? _existingCharacterData;
@@ -406,8 +414,15 @@ public sealed class PersonalityEditModal : IClickableMenu
 
         DrawTitle(b);
         DrawPortraitCard(b);
+
+        // Rebuilt by DrawTextField as the rows are drawn, since they move with the scroll offset.
+        _keyboardButtons.Clear();
         DrawScrollableContent(b);
+
         DrawFooter(b);
+
+        // Above the form it covers, below the cursor.
+        _keyboard.Draw(b);
         drawMouse(b);
     }
 
@@ -552,9 +567,44 @@ public sealed class PersonalityEditModal : IClickableMenu
 
     private void DrawTextField(SpriteBatch b, int relativeY, string labelKey, MultilineTextBox box, Color? labelColor = null, int? labelX = null)
     {
-        Utility.drawTextWithShadow(b, _i18n.Get(labelKey), Game1.smallFont,
-            new Vector2(labelX ?? _scrollArea.X, ContentY(relativeY)), labelColor ?? Color.Black);
+        var label = _i18n.Get(labelKey).ToString();
+        var x = labelX ?? _scrollArea.X;
+        var y = ContentY(relativeY);
+
+        Utility.drawTextWithShadow(b, label, Game1.smallFont, new Vector2(x, y), labelColor ?? Color.Black);
         box.Draw(b);
+
+        // Touch and click arrive identically, so one always-visible button per field covers mobile.
+        // The row scrolls, so only register it while it is actually inside the scroll viewport —
+        // otherwise it would draw over the header and still be clickable.
+        var launcher = GetKeyboardButtonBounds(x, y, label);
+        if (!_scrollArea.Contains(launcher.Center))
+            return;
+
+        VirtualKeyboard.DrawLauncherButton(b, launcher, _keyboard.IsTargeting(box));
+        _keyboardButtons.Add((launcher, FieldFor(box), box));
+    }
+
+    /// <summary>
+    /// Where a field's keyboard button sits: just after its label. Measured from the label text so
+    /// drawing and hit-testing can't disagree, and so it follows translated label widths.
+    /// </summary>
+    private static Rectangle GetKeyboardButtonBounds(int labelX, int labelY, string label)
+    {
+        const int size = 32;
+        var labelWidth = (int)Game1.smallFont.MeasureString(label ?? "").X;
+        var centreY = labelY + (int)(Game1.smallFont.MeasureString("A").Y / 2);
+        return new Rectangle(labelX + labelWidth + 12, centreY - size / 2, 40, size);
+    }
+
+    private ActiveField FieldFor(MultilineTextBox box)
+    {
+        foreach (var (field, candidate) in TextBoxes())
+        {
+            if (ReferenceEquals(candidate, box))
+                return field;
+        }
+        return ActiveField.None;
     }
 
     // Selector/toggle buttons live inside the padded Character Data panel.
@@ -603,6 +653,27 @@ public sealed class PersonalityEditModal : IClickableMenu
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
         EnsureLayout();
+
+        // The keyboard gets first refusal: it covers the modal, so anything beneath it is
+        // unreachable rather than merely hidden.
+        if (_keyboard.ReceiveLeftClick(x, y))
+            return;
+
+        foreach (var (bounds, field, box) in _keyboardButtons)
+        {
+            if (!bounds.Contains(x, y))
+                continue;
+
+            SetActiveField(field);
+            if (_keyboard.IsTargeting(box))
+                _keyboard.Close();
+            else
+                _keyboard.Open(box);
+
+            Game1.playSound("bigSelect");
+            return;
+        }
+
         if (_cancelButton.Contains(x, y))
         {
             Game1.playSound("bigDeSelect");
@@ -723,6 +794,11 @@ public sealed class PersonalityEditModal : IClickableMenu
 
     private void SetActiveField(ActiveField field)
     {
+        // Moving focus away from a field the keyboard is typing into would leave it aimed at a
+        // deselected box, so put it away unless it belongs to the field being selected.
+        if (field == ActiveField.None && _keyboard.IsOpen)
+            _keyboard.Close();
+
         _activeField = field;
         foreach (var (candidate, box) in TextBoxes())
             box.Selected = candidate == field;
@@ -749,6 +825,14 @@ public sealed class PersonalityEditModal : IClickableMenu
     {
         if (key == Keys.Escape)
         {
+            // Escape puts the keyboard away first, so it can't discard the whole edit from
+            // under someone who only wanted to dismiss the keyboard.
+            if (_keyboard.IsOpen)
+            {
+                _keyboard.Close();
+                return;
+            }
+
             Close();
             return;
         }
