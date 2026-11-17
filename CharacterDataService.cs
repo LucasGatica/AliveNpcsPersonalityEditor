@@ -7,37 +7,89 @@ using StardewValley.GameData.Characters;
 
 namespace AliveNpcsPersonalityEditor;
 
+/// <summary>
+/// Edits Data/Characters in three passes: snapshot the original social fields (Early), apply the player's
+/// overrides (Late), then record other mods' changes and put the original social fields back (last).
+/// </summary>
+/// <remarks>
+/// Nothing inside these passes may load Data/Characters again, whether directly, through a token or game state
+/// query that reads it, or by invalidating it: SMAPI then logs "Broke loop while loading asset 'Data/Characters'"
+/// and loads it with no mod edits at all. So the passes only copy raw values. Display names and CanSocialize are
+/// resolved when something reads them, and the diagnostics for AliveNpcs are pushed on the next tick.
+/// </remarks>
 public sealed class CharacterDataService
 {
     private const string CharactersAssetName = "Data/Characters";
 
-    private static readonly Dictionary<string, int[]> BaseSnapshots = new(StringComparer.OrdinalIgnoreCase);
+    // Each overridden NPC's fields just before the player's override is applied (what the editor's Reset reverts to).
+    private static readonly Dictionary<string, ScopedFields> BaseSnapshots = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The pre-override fields of an NPC as [gender, age, manner, socialAnxiety, optimism, canSocialize(0/1),
+    /// canBeRomanced(0/1)]. CanSocialize is resolved now, outside the asset load.
+    /// </summary>
     public static bool TryGetBaseSnapshot(string npcName, out int[] snapshot)
-        => BaseSnapshots.TryGetValue(npcName, out snapshot!);
+    {
+        if (!BaseSnapshots.TryGetValue(npcName, out var s))
+        {
+            snapshot = null!;
+            return false;
+        }
+
+        snapshot = new[]
+        {
+            s.Gender,
+            s.Age,
+            s.Manner,
+            s.SocialAnxiety,
+            s.Optimism,
+            s.CanSocialize ? 1 : 0,
+            s.CanBeRomanced ? 1 : 0,
+        };
+        return true;
+    }
 
     internal sealed class ScopedFields
     {
-        public string DisplayName = "";
+        /// <summary>DisplayName as the asset holds it, often a token such as <c>[LocalizedText Strings\NPCNames:Harvey]</c>.</summary>
+        public string? RawDisplayName;
         public int Gender, Age, Manner, SocialAnxiety, Optimism;
-        public bool CanSocialize;
+        /// <summary>CanSocialize as the asset holds it: a game state query, true when unset.</summary>
+        public string? RawCanSocialize;
         public bool CanBeRomanced;
+
+        /// <summary>The display name as text in the current language. Never read it inside a Data/Characters edit.</summary>
+        public string DisplayName => ResolveName(RawDisplayName);
+
+        /// <summary>Whether the NPC can socialize right now. Never read it inside a Data/Characters edit.</summary>
+        public bool CanSocialize => ResolveCanSocialize(RawCanSocialize);
     }
 
     private static readonly Dictionary<string, ScopedFields> Originals = new(StringComparer.OrdinalIgnoreCase);
+    // Other mods' changes (npc -> field -> value) found by the last pass, DisplayName still as the asset holds it.
+    private static readonly Dictionary<string, Dictionary<string, string>> DetectedRaw = new(StringComparer.OrdinalIgnoreCase);
+    // The same changes with DisplayName resolved, rebuilt from DetectedRaw when read (see ResolveDetected).
     private static readonly Dictionary<string, Dictionary<string, string>> DetectedExternal = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> ReportedNpcs = new(StringComparer.OrdinalIgnoreCase);
 
-    public static bool HasDetectedConflicts => DetectedExternal.Count > 0;
+    private static Func<Dictionary<string, NpcOverrideEntry>>? _overridesSource;
+    // DetectedRaw changed since DetectedExternal was built.
+    private static bool _detectedStale;
+    // A load finished and AliveNpcs hasn't been sent its diagnostics yet.
+    private static bool _diagnosticsPending;
+    // True from our first to our last pass of a Data/Characters load: nothing may be resolved meanwhile.
+    private static bool _editing;
+
+    public static bool HasDetectedConflicts => ResolveDetected().Count > 0;
 
     internal static bool TryGetOriginal(string npc, out ScopedFields fields)
         => Originals.TryGetValue(npc, out fields!);
 
-    public static IReadOnlyDictionary<string, Dictionary<string, string>> GetDetectedExternalChanges() => DetectedExternal;
+    public static IReadOnlyDictionary<string, Dictionary<string, string>> GetDetectedExternalChanges() => ResolveDetected();
 
     public static string? GetEffectiveDisplayName(string npc)
     {
-        if (DetectedExternal.TryGetValue(npc, out var d) && d.TryGetValue("DisplayName", out var name) && !string.IsNullOrWhiteSpace(name))
+        if (ResolveDetected().TryGetValue(npc, out var d) && d.TryGetValue("DisplayName", out var name) && !string.IsNullOrWhiteSpace(name))
             return name;
         return Originals.TryGetValue(npc, out var o) ? o.DisplayName : null;
     }
@@ -46,7 +98,7 @@ public sealed class CharacterDataService
     {
         if (!Originals.TryGetValue(npc, out var o))
             return null;
-        DetectedExternal.TryGetValue(npc, out var d);
+        ResolveDetected().TryGetValue(npc, out var d);
 
         int Pick(string field, int orig) =>
             d != null && d.TryGetValue(field, out var s) && int.TryParse(s, out var v) ? v : orig;
@@ -97,15 +149,16 @@ public sealed class CharacterDataService
         }
     }
 
+    // Raw copies only: no token or query is resolved here, since this runs inside the asset load.
     private static ScopedFields Extract(CharacterData d) => new()
     {
-        DisplayName = ResolveName(d.DisplayName),
+        RawDisplayName = d.DisplayName,
         Gender = (int)d.Gender,
         Age = (int)d.Age,
         Manner = (int)d.Manner,
         SocialAnxiety = (int)d.SocialAnxiety,
         Optimism = (int)d.Optimism,
-        CanSocialize = ResolveCanSocialize(d.CanSocialize),
+        RawCanSocialize = d.CanSocialize,
         CanBeRomanced = d.CanBeRomanced
     };
 
@@ -120,20 +173,70 @@ public sealed class CharacterDataService
 
     private readonly IMonitor _monitor;
     private readonly Func<Dictionary<string, NpcOverrideEntry>> _getOverrides;
-    private readonly Action? _onRestored;
     private Action<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>? _onDiagnostics;
 
-    public CharacterDataService(IMonitor monitor, Func<Dictionary<string, NpcOverrideEntry>> getOverrides, Action? onRestored = null)
+    public CharacterDataService(IMonitor monitor, Func<Dictionary<string, NpcOverrideEntry>> getOverrides)
     {
         _monitor = monitor;
         _staticMonitor = monitor;
         _getOverrides = getOverrides;
-        _onRestored = onRestored;
+        _overridesSource = getOverrides;
     }
 
     public void OnDiagnosticsReady(Action<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> callback)
     {
         _onDiagnostics = callback;
+    }
+
+    /// <summary>
+    /// Sends AliveNpcs the diagnostics of the last Data/Characters load. Called every tick: building them resolves
+    /// display names, which can't be done inside the load itself.
+    /// </summary>
+    public void FlushPendingDiagnostics()
+    {
+        if (!_diagnosticsPending || _editing)
+            return;
+
+        _diagnosticsPending = false;
+        ResolveDetected();
+        PushDiagnostics();
+    }
+
+    /// <summary>
+    /// The detected changes with DisplayName as text: a raw name that differs from the original but reads the same
+    /// (another token for the same name), or that is the player's own override, is not a change.
+    /// </summary>
+    private static Dictionary<string, Dictionary<string, string>> ResolveDetected()
+    {
+        if (!_detectedStale || _editing)
+            return DetectedExternal;
+
+        _detectedStale = false;
+        DetectedExternal.Clear();
+        var overrides = _overridesSource?.Invoke();
+        foreach (var (npc, raw) in DetectedRaw)
+        {
+            var changed = new Dictionary<string, string>(raw);
+            if (changed.TryGetValue("DisplayName", out var rawName))
+            {
+                var name = ResolveName(rawName);
+                var originalName = Originals.TryGetValue(npc, out var o) ? o.DisplayName : "";
+                var userName = overrides != null && overrides.TryGetValue(npc, out var entry) ? entry.CharacterData?.DisplayName : null;
+                if (string.Equals(name, originalName) || (userName != null && string.Equals(userName, name)))
+                    changed.Remove("DisplayName");
+                else
+                    changed["DisplayName"] = name;
+            }
+
+            if (changed.Count == 0)
+                continue;
+
+            DetectedExternal[npc] = changed;
+            if (ReportedNpcs.Add(npc))
+                _staticMonitor?.Log($"CharacterData conflict: another mod changed {npc} ({string.Join(", ", changed.Keys)}). Restoring original values.", LogLevel.Info);
+        }
+
+        return DetectedExternal;
     }
 
     private void PushDiagnostics()
@@ -169,7 +272,11 @@ public sealed class CharacterDataService
 
         // Early: capture vanilla data BEFORE any mod applies overrides (including our own Late pass).
         // Registered as a separate handler so it fires on the very first asset load.
-        e.Edit(asset => CaptureOriginals(asset.AsDictionary<string, CharacterData>().Data), AssetEditPriority.Early);
+        e.Edit(asset =>
+        {
+            _editing = true;
+            CaptureOriginals(asset.AsDictionary<string, CharacterData>().Data);
+        }, AssetEditPriority.Early);
 
         // Late: apply user overrides.
         e.Edit(asset =>
@@ -188,32 +295,27 @@ public sealed class CharacterDataService
                 if (!data.TryGetValue(npcName, out var characterData))
                     continue;
 
-                CaptureBaseSnapshot(npcName, characterData);
+                BaseSnapshots[npcName] = Extract(characterData);
                 ApplyCharacterDataOverride(characterData, entry.CharacterData);
             }
         }, AssetEditPriority.Late);
 
-        e.Edit(asset => DetectExternalChanges(asset.AsDictionary<string, CharacterData>().Data),
-            (AssetEditPriority)1_000_000);
-    }
-
-    private static void CaptureBaseSnapshot(string npcName, CharacterData d)
-    {
-        BaseSnapshots[npcName] = new[]
+        e.Edit(asset =>
         {
-            (int)d.Gender,
-            (int)d.Age,
-            (int)d.Manner,
-            (int)d.SocialAnxiety,
-            (int)d.Optimism,
-            ResolveCanSocialize(d.CanSocialize) ? 1 : 0,
-            d.CanBeRomanced ? 1 : 0,
-        };
+            try
+            {
+                DetectExternalChanges(asset.AsDictionary<string, CharacterData>().Data);
+            }
+            finally
+            {
+                _editing = false;
+            }
+        }, (AssetEditPriority)1_000_000);
     }
 
     private void DetectExternalChanges(IDictionary<string, CharacterData> data)
     {
-        var anyRestored = false;
+        var overrides = _getOverrides();
         foreach (var (npc, cd) in data)
         {
             if (!Originals.TryGetValue(npc, out var original))
@@ -223,8 +325,7 @@ public sealed class CharacterDataService
             }
 
             var current = Extract(cd);
-            var userEntry = _getOverrides().TryGetValue(npc, out var e) ? e : null;
-            var userCd = userEntry?.CharacterData;
+            var userCd = overrides != null && overrides.TryGetValue(npc, out var e) ? e.CharacterData : null;
             var changed = new Dictionary<string, string>();
 
             void Check(string name, object orig, object now, bool isPlayerEdit)
@@ -234,8 +335,10 @@ public sealed class CharacterDataService
                 changed[name] = now?.ToString() ?? "";
             }
 
-            Check("DisplayName", original.DisplayName, current.DisplayName,
-                userCd?.DisplayName != null && string.Equals(userCd.DisplayName, current.DisplayName));
+            // DisplayName is compared as the asset holds it; whether the names really read differently (and whether
+            // it's the player's own override) is settled when read, in ResolveDetected.
+            if (!string.Equals(original.RawDisplayName, current.RawDisplayName, StringComparison.Ordinal))
+                changed["DisplayName"] = current.RawDisplayName ?? "";
             Check("Gender", original.Gender, current.Gender, userCd?.Gender == current.Gender);
             Check("Age", original.Age, current.Age, userCd?.Age == current.Age);
             Check("Manner", original.Manner, current.Manner, userCd?.Manner == current.Manner);
@@ -243,29 +346,23 @@ public sealed class CharacterDataService
             Check("Optimism", original.Optimism, current.Optimism, userCd?.Optimism == current.Optimism);
 
             if (changed.Count > 0)
-            {
-                DetectedExternal[npc] = changed;
-                if (ReportedNpcs.Add(npc))
-                    _monitor.Log($"CharacterData conflict: another mod changed {npc} ({string.Join(", ", changed.Keys)}). Restoring original values.", LogLevel.Info);
-            }
+                DetectedRaw[npc] = changed;
             else
-            {
-                DetectedExternal.Remove(npc);
-            }
+                DetectedRaw.Remove(npc);
 
             RestoreScopedFields(cd, original);
-            anyRestored = true;
         }
 
-        if (anyRestored && DetectedExternal.Count > 0)
-            _onRestored?.Invoke();
-
-        PushDiagnostics();
+        // The restored values are already in this asset, so there is nothing to reload: invalidating Data/Characters
+        // here (as this pass used to) reloaded it from inside its own load.
+        _detectedStale = true;
+        _diagnosticsPending = true;
     }
 
     private static void RestoreScopedFields(CharacterData cd, ScopedFields o)
     {
-        cd.DisplayName = o.DisplayName;
+        // The original as the asset held it, so a localizable name keeps following the game's language.
+        cd.DisplayName = o.RawDisplayName!;
         cd.Gender = (Gender)o.Gender;
         cd.Age = (NpcAge)o.Age;
         cd.Manner = (NpcManner)o.Manner;
