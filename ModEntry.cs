@@ -76,8 +76,10 @@ public sealed class ModEntry : Mod
             Monitor.Log($"Gallery service initialized — server: {_config.GalleryServerUrl}", LogLevel.Info);
         }
 
-        _characterDataService = new CharacterDataService(Monitor, () => _store.Overrides, OnCharacterDataRestored);
+        _characterDataService = new CharacterDataService(Monitor, () => _store.Overrides);
         Helper.Events.Content.AssetRequested += _characterDataService.OnAssetRequested;
+        // Diagnostics resolve display names, so they go out on the tick after a Data/Characters load, never inside it.
+        Helper.Events.GameLoop.UpdateTicked += (_, _) => _characterDataService?.FlushPendingDiagnostics();
         Helper.Events.GameLoop.SaveLoaded += OnSaveLoadedReportCdConflicts;
 
         // Push CD diagnostics (detected external changes + originals) to AliveNpcs for the prompt builder.
@@ -108,11 +110,6 @@ public sealed class ModEntry : Mod
     {
         try { _api?.SetCharacterSheetOverrideEnabled(_config.OverrideCharacterSheet); }
         catch (Exception ex) { Monitor.Log($"Could not push character sheet override setting: {ex.Message}", LogLevel.Trace); }
-    }
-
-    private void OnCharacterDataRestored()
-    {
-        Helper.GameContent.InvalidateCache("Data/Characters");
     }
 
     private void OnSaveLoadedReportCdConflicts(object? sender, SaveLoadedEventArgs e)
